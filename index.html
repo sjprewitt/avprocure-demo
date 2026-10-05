@@ -1,0 +1,2437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AVProcure</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
+<script>
+window.onerror=function(msg,src,line,col,err){
+  const el=document.getElementById('toast');
+  if(el){el.textContent='Error: '+msg;el.className='show error';setTimeout(()=>el.className='',6000);}
+  console.error('GLOBAL ERROR:',msg,src,line,col,err);
+  return false;
+};
+window.addEventListener('unhandledrejection',function(e){
+  console.error('UNHANDLED REJECTION:',e.reason);
+});
+</script>
+<link rel="stylesheet" href="css/app.css">
+<!-- ##APP_USER_INJECT## -->
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div onclick="showPage('inv')" style="cursor:pointer;">
+    <div class="logo-mark">AV</div>
+    <div class="logo-name">Procure</div>
+  </div>
+  <div class="topbar-center">
+    <button class="nav-tab active" id="tab-map" onclick="showPage('map')">
+      <span class="nav-icon">🗺</span> Map
+    </button>
+    <button class="nav-tab" id="tab-fd" onclick="showPage('fd');renderFDPage();setFDTab('clients')">
+      <span class="nav-icon">🗂</span><span class="nav-label"> Front Desk</span>
+    </button>
+    <button class="nav-tab" id="tab-inv" onclick="showPage('inv')">
+      <span class="nav-icon">⬡</span><span class="nav-label"> Inventory</span>
+    </button>
+    <button class="nav-tab" id="tab-pb" onclick="showPage('pb')">
+      <span class="nav-icon">◈</span><span class="nav-label"> Pricebook</span>
+    </button>
+    <button class="nav-tab" id="tab-orders" onclick="showPage('orders');showOrdersList()">
+      <span class="nav-icon">◉</span><span class="nav-label"> Orders</span>
+    </button>
+    <button class="nav-tab" id="tab-rma" onclick="showPage('rma');showRMAList()">
+      <span class="nav-icon">↩</span><span class="nav-label"> RMAs</span>
+    </button>
+    <button class="nav-tab" id="tab-loc" onclick="showPage('loc');renderLocPage()">
+      <span class="nav-icon">⬡</span><span class="nav-label"> Locations</span>
+    </button>
+    <button class="nav-tab" id="tab-proj" onclick="showPage('proj');showProjList()">
+      <span class="nav-icon">◫</span><span class="nav-label"> Projects</span>
+    </button>
+  </div>
+  <div class="topbar-right">
+    <button id="nav-hamburger" onclick="toggleNavDrawer()">☰</button>
+    <div id="unsaved-badge"><div class="pulse"></div><span id="unsaved-text">Saving…</span></div>
+    <button class="btn btn-ghost" id="btn-open" onclick="openFile()">📂<span class="btn-text"> Open</span></button>
+    <button class="btn btn-ghost" id="btn-refresh" onclick="refreshWorkbook()" title="Reload workbook data">↺<span class="btn-text"> Refresh</span></button>
+    <input type="file" id="file-input" accept=".xlsx,.xls" onchange="openWorkbook(event)">
+    <div id="export-wrap" style="position:relative;display:inline-block;">
+      <button class="btn btn-ghost" id="btn-export" onclick="toggleExportMenu()">📥<span class="btn-text"> Export</span></button>
+      <div id="export-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--border-bright);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.5);z-index:400;min-width:210px;padding:4px;">
+        <button onclick="doExport('xlsx')" style="display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);font-family:var(--font-ui);font-size:12px;padding:9px 12px;border-radius:5px;cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">📊 Excel workbook (.xlsx)</button>
+        <button onclick="doExport('json')" style="display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);font-family:var(--font-ui);font-size:12px;padding:9px 12px;border-radius:5px;cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">🧾 JSON data (.json)</button>
+        <button onclick="doExport('db')" style="display:block;width:100%;text-align:left;background:none;border:none;color:var(--text);font-family:var(--font-ui);font-size:12px;padding:9px 12px;border-radius:5px;cursor:pointer;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='none'">🗄 SQLite database (.db)</button>
+      </div>
+    </div>
+    <!-- ##LOGOUT_INJECT## -->
+    <!-- Mobile-only ⋯ actions button -->
+    <button id="topbar-actions-btn" onclick="toggleTopbarActions()" title="Actions">⋯</button>
+  </div>
+  <!-- Mobile-only topbar actions panel -->
+  <div id="topbar-actions-backdrop" onclick="closeTopbarActions()"></div>
+  <div id="topbar-actions-panel">
+    <button class="ta-item" onclick="refreshWorkbook();closeTopbarActions()">↺  Refresh Data</button>
+    <button class="ta-item export-admin-only" onclick="doExport('xlsx');closeTopbarActions()">📊  Export — Excel (.xlsx)</button>
+    <button class="ta-item export-admin-only" onclick="doExport('json');closeTopbarActions()">🧾  Export — JSON (.json)</button>
+    <button class="ta-item export-admin-only" onclick="doExport('db');closeTopbarActions()">🗄  Export — SQLite DB (.db)</button>
+  </div>
+</div>
+<div id="nav-overlay" onclick="closeNavDrawer()"></div>
+<div id="add-sheet-backdrop" onclick="closeMobileAddSheet()"></div>
+<button id="mobile-fab" onclick="toggleMobileAddSheet()">＋</button>
+
+<!-- More-nav backdrop (mobile) -->
+<div id="bn-more-backdrop" onclick="closeBnMore()"></div>
+<!-- More-nav dropup panel (mobile) -->
+<div id="bn-more-panel">
+  <button class="bn-more-item" id="bn-proj" onclick="showPage('proj');showProjList();closeBnMore()">
+    <span class="bn-more-icon">◫</span>Projects
+  </button>
+  <button class="bn-more-item" id="bn-pb" onclick="showPage('pb');closeBnMore()">
+    <span class="bn-more-icon">◈</span>Pricebook
+  </button>
+  <button class="bn-more-item" id="bn-rma" onclick="showPage('rma');showRMAList();closeBnMore()">
+    <span class="bn-more-icon">↩</span>RMAs
+  </button>
+  <button class="bn-more-item" id="bn-loc" onclick="showPage('loc');renderLocPage();closeBnMore()">
+    <span class="bn-more-icon">⬡</span>Locations
+  </button>
+</div>
+<!-- BOTTOM NAV (mobile only) — 4 primary tabs + More -->
+<nav id="bottom-nav">
+  <button class="bn-tab active" id="bn-map" onclick="showPage('map')">
+    <span class="bn-icon">🗺</span><span class="bn-label">Map</span>
+  </button>
+  <button class="bn-tab" id="bn-fd" onclick="showPage('fd');renderFDPage();setFDTab('clients')">
+    <span class="bn-icon">🗂</span><span class="bn-label">Front Desk</span>
+  </button>
+  <button class="bn-tab" id="bn-inv" onclick="showPage('inv')">
+    <span class="bn-icon">⬡</span><span class="bn-label">Inventory</span>
+  </button>
+  <button class="bn-tab" id="bn-orders" onclick="showPage('orders');showOrdersList()">
+    <span class="bn-icon">◉</span><span class="bn-label">Orders</span>
+  </button>
+  <button class="bn-tab" id="bn-more" onclick="toggleBnMore()">
+    <span class="bn-icon" id="bn-more-icon">≡</span><span class="bn-label">More</span>
+  </button>
+</nav>
+
+<!-- STATUS BAR -->
+<div id="status-bar">
+  <div class="status-pill">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-text">No workbook loaded</span>
+  </div>
+  <span id="catalog-stats"></span>
+</div>
+
+<!-- APP BODY -->
+<div id="app-body">
+
+  <!-- ══ MAP PAGE ══ -->
+  <div class="page active" id="page-map">
+    <iframe
+      src="./warehouse-map.php?v=2"
+      style="width:100%; height:100%; border:none; display:block;"
+      id="map-frame">
+    </iframe>
+  </div>
+
+  <!-- ══ INVENTORY PAGE ══ -->
+  <div class="page" id="page-inv">
+
+    <!-- Import screen (shown when no workbook) -->
+    <div id="inv-content" style="flex:1;flex-direction:column;overflow:hidden;display:flex;">
+      <div class="page-toolbar">
+        <div class="stat-chip" id="chip-skus">0 <span>SKUs</span></div>
+        <div class="stat-chip" id="chip-units">0 <span>units</span></div>
+        <div class="stat-chip" id="chip-serialized">0 <span>serialized</span></div>
+        <div class="stat-chip" id="chip-bulk">0 <span>bulk</span></div>
+        <div class="inv-loc-filter-group">
+          <select id="inv-loc-f1" class="inv-loc-f-sel" onchange="invLocFilterT1Change()">
+            <option value="">Aisle…</option>
+          </select>
+          <select id="inv-loc-f2" class="inv-loc-f-sel" onchange="invLocFilterT2Change()" disabled style="opacity:0.5">
+            <option value="">Rack…</option>
+          </select>
+          <select id="inv-loc-f3" class="inv-loc-f-sel" onchange="invLocFilterT3Change()" disabled style="opacity:0.5">
+            <option value="">Shelf…</option>
+          </select>
+        </div>
+        <div class="inv-search-group">
+          <select id="inv-status-filter" class="inv-status-f-sel" onchange="setInvStatusFilter(this.value)">
+            <option value="">All Status</option>
+          </select>
+          <div class="search-wrap" style="margin-left:0;">
+            <span style="color:var(--text-dim);font-size:12px">⌕</span>
+            <input id="inv-search-input" type="text" placeholder="Search inventory…" oninput="filterInv(this.value);document.getElementById('inv-search-clear').style.display=this.value?'flex':'none'">
+            <button id="inv-search-clear" onclick="document.getElementById('inv-search-input').value='';this.style.display='none';filterInv('')" style="display:none;background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;padding:0;line-height:1;align-items:center;">✕</button>
+          </div>
+          <button class="btn btn-ghost" onclick="openDeployCart()" style="padding:6px 12px;font-size:12px;" title="Deployment cart — stage items to release with a manifest">🚚 <span id="deploy-cart-badge">Cart</span></button>
+          <button class="btn btn-ghost" onclick="openDeploymentsLog()" style="padding:6px 12px;font-size:12px;" title="Past deployments / release history">📋 Deployments</button>
+        </div>
+      </div>
+      <div id="scan-mode-banner">
+        <span style="font-weight:700;font-size:12px;color:var(--accent3)">⬡ Scan Mode</span>
+        <div class="scan-loc-chip" onclick="openScanLocPicker()">
+          📍 <span id="scan-loc-label">No location set</span> ▾
+        </div>
+        <div class="scan-status-chip" onclick="cycleScanStatus()">
+          <span id="scan-status-label">Unallocated</span>
+        </div>
+        <span id="scan-mode-end" onclick="endScanMode()"
+          style="margin-left:auto;cursor:pointer;color:var(--text-dim);font-size:12px;padding:2px 6px;">✕ End scan</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="mobile-hide" style="width:26px;text-align:center"><input type="checkbox" id="inv-select-all" title="Select all on this page" onchange="toggleInvSelectAll(this.checked)"></th>
+            <th class="mobile-hide" style="width:28px"></th>
+            <th class="sortable mobile-hide" onclick="setSort('inv','sku')">SKU</th>
+            <th class="sortable" onclick="setSort('inv','manufacturer')">Manufacturer</th>
+            <th class="sortable" onclick="setSort('inv','model')">Model</th>
+            <th class="sortable mobile-hide" style="width:56px" onclick="setSort('inv','qty')">Qty</th>
+            <th id="th-par" class="sortable" style="width:56px;display:none" onclick="setSort('inv','par')">Par</th>
+            <th class="sortable mobile-hide" style="width:90px" onclick="setSort('inv','type')">Type</th>
+            <th class="sortable mobile-hide" onclick="setSort('inv','serial')">Serial Number</th>
+            <th class="sortable mobile-hide" style="width:90px" onclick="setSort('inv','condition')">Condition</th>
+            <th class="sortable mobile-hide" style="width:116px" onclick="setSort('inv','status')">Status</th>
+            <th class="sortable mobile-hide" onclick="setSort('inv','location')">Location</th>
+            <th class="sortable mobile-hide" onclick="setSort('inv','project')">Project</th>
+            <th class="mobile-hide" style="width:80px"></th>
+          </tr></thead>
+          <tbody id="inv-tbody"></tbody>
+        </table>
+      </div>
+      <div id="inv-pagination" style="display:none;align-items:center;justify-content:center;gap:10px;padding:7px 16px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;flex-wrap:wrap;">
+        <button class="btn btn-ghost" id="inv-pag-prev" onclick="invPagPrev()" style="padding:4px 12px;font-size:12px;">← Prev</button>
+        <span id="inv-pag-info" style="font-size:12px;color:var(--text-muted);"></span>
+        <select id="inv-pag-jump" onchange="invPagJump(this.value)" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text);padding:3px 6px;cursor:pointer;outline:none;"></select>
+        <button class="btn btn-ghost" id="inv-pag-next" onclick="invPagNext()" style="padding:4px 12px;font-size:12px;">Next →</button>
+        <select id="inv-page-size" onchange="invSetPageSize(this.value)" style="background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;color:var(--text);padding:3px 6px;cursor:pointer;outline:none;margin-left:6px;">
+          <option value="25">25 / page</option>
+          <option value="50" selected>50 / page</option>
+          <option value="100">100 / page</option>
+          <option value="0">All</option>
+        </select>
+      </div>
+      <div class="add-bar">
+        <div class="form-row">
+          <div class="fg fw-180">
+            <label class="fl">Manufacturer</label>
+            <div class="ac-wrap">
+              <input class="ac-input" id="inv-mfg" type="text" placeholder="Type to search…"
+                     autocomplete="off" oninput="acFilter('inv','mfg')" onfocus="acOpen('inv','mfg')" onkeydown="acKey(event,'inv','mfg')">
+              <div class="ac-dropdown" id="dd-inv-mfg"></div>
+            </div>
+          </div>
+          <div class="fg fw-220">
+            <label class="fl">Model</label>
+            <div class="ac-wrap">
+              <input class="ac-input" id="inv-model" type="text" placeholder="Select manufacturer first…"
+                     autocomplete="off" oninput="acFilter('inv','model')" onfocus="acOpen('inv','model')" onkeydown="acKey(event,'inv','model')" disabled>
+              <div class="ac-dropdown" id="dd-inv-model"></div>
+            </div>
+          </div>
+          <div class="fg fw-180">
+            <label class="fl">Category</label>
+            <div class="ac-wrap">
+              <input class="ac-input" id="inv-cat" type="text" placeholder="Select or type…"
+                     autocomplete="off" oninput="acFilter('inv','cat')" onfocus="acOpen('inv','cat')" onkeydown="acKey(event,'inv','cat')">
+              <div class="ac-dropdown" id="dd-inv-cat"></div>
+            </div>
+          </div>
+          <div class="fg fw-130">
+            <label class="fl">SKU <span style="color:var(--text-dim);font-size:8px;letter-spacing:0">(auto)</span></label>
+            <input class="plain-input" id="inv-sku" type="text" placeholder="—" readonly
+                   style="color:var(--accent);font-family:var(--font-mono);font-size:11px;background:var(--surface3)">
+          </div>
+          <div class="fg" style="flex:0 0 auto;min-width:260px;">
+            <label class="fl">Location</label>
+            <select id="inv-loc" style="display:none" onchange="invLocChanged()">
+              <option value="">— None —</option>
+            </select>
+            <div style="display:flex;gap:4px;">
+              <select id="inv-loc-t1" class="plain-select" style="flex:1;min-width:0;" onchange="_locCascadeT1('inv')">
+                <option value="">Aisle…</option>
+              </select>
+              <select id="inv-loc-t2" class="plain-select" style="flex:1;min-width:0;" disabled onchange="_locCascadeT2('inv')">
+                <option value="">Rack…</option>
+              </select>
+              <select id="inv-loc-t3" class="plain-select" style="flex:1;min-width:0;" disabled onchange="_locCascadeT3('inv')">
+                <option value="">Shelf…</option>
+              </select>
+            </div>
+          </div>
+          <div class="fg fw-110">
+            <label class="fl">Condition</label>
+            <select class="plain-select" id="inv-cond">
+              <option>New</option><option>Good</option><option>Fair</option><option>Damaged</option>
+            </select>
+          </div>
+          <div class="fg fw-110">
+            <label class="fl">Inv Status</label>
+            <select class="plain-select" id="inv-status">
+              <option>Unallocated</option>
+              <option>Allocated</option>
+              <option>Deployed</option>
+              <option>Returned</option>
+            </select>
+          </div>
+          <div class="fg fw-120">
+            <label class="fl">Project</label>
+            <select class="plain-select" id="inv-proj">
+              <option value="">— None —</option>
+            </select>
+          </div>
+          <div class="fg fw-flex">
+            <label class="fl">Notes</label>
+            <input class="plain-input" id="inv-notes" type="text" placeholder="Optional">
+          </div>
+          <div class="fg fw-130b">
+            <label class="fl">Type</label>
+            <div class="type-toggle">
+              <button id="tog-serial" class="active" onclick="setInvType('serialized')">Serialized</button>
+              <button id="tog-bulk" onclick="setInvType('bulk')">Bulk</button>
+            </div>
+          </div>
+          <div class="fg fw-68" id="inv-qty-grp" style="display:none">
+            <label class="fl">Qty</label>
+            <input class="plain-input" id="inv-qty" type="number" min="1" value="1">
+          </div>
+          <div class="fg fw-148" id="inv-serial-grp">
+            <label class="fl">Serial Number</label>
+            <div style="display:flex;gap:5px;align-items:center;">
+              <input class="plain-input" id="inv-serial" type="text" placeholder="Scan or type"
+                     style="flex:1;min-width:0;"
+                     onkeydown="if(event.key==='Enter'){event.preventDefault();document.getElementById('inv-loc-t1').focus();}">
+              <button class="scan-btn" title="Scan barcode / QR" onclick="openScanner(document.getElementById('inv-serial'))">⊡</button>
+            </div>
+          </div>
+          <button class="btn-add" id="inv-btn-add" onclick="addInvItem()" disabled>Add</button>
+          <button class="btn-add" id="inv-btn-batch" onclick="openBatchAddModal()" disabled
+            style="background:rgba(79,247,160,0.12);color:var(--accent3);border-color:rgba(79,247,160,0.3);" title="Add multiple serialized items at once">+ Batch</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ BATCH ADD MODAL ══ -->
+  <div id="batch-add-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:500;align-items:center;justify-content:center;">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:540px;max-width:95vw;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+      <div style="padding:18px 24px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <span style="font-size:16px">⊕</span>
+        <div>
+          <div style="font-size:15px;font-weight:700">Batch Add — Serialized Items</div>
+          <div id="batch-subtitle" style="font-size:11px;color:var(--text-muted);margin-top:2px;font-family:var(--font-mono);"></div>
+        </div>
+        <button onclick="closeBatchAddModal()" style="margin-left:auto;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+      </div>
+      <div style="padding:16px 24px 12px;border-bottom:1px solid var(--border);flex-shrink:0;">
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+          <div style="display:flex;flex-direction:column;gap:4px;flex:0 0 68px;">
+            <label class="fl">Quantity</label>
+            <input type="text" id="batch-qty" list="batch-qty-options" value="2"
+              style="width:100%;padding:6px 8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text);outline:none;text-align:center;"
+              onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+              oninput="batchRebuildSerialFields()">
+            <datalist id="batch-qty-options">
+              <option value="1"><option value="2"><option value="3"><option value="4"><option value="5">
+              <option value="6"><option value="7"><option value="8"><option value="9"><option value="10">
+            </datalist>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);padding-bottom:8px;">serialized units · fill in serial numbers below. All other fields (location, condition, status, project, notes) are copied from the main form.</div>
+        </div>
+      </div>
+      <div id="batch-serial-fields" style="overflow-y:auto;padding:14px 24px;display:flex;flex-direction:column;gap:8px;flex:1;"></div>
+      <div style="padding:14px 24px 18px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0;">
+        <button onclick="closeBatchAddModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="confirmBatchAdd()"
+          style="padding:8px 20px;background:rgba(79,247,160,0.15);color:var(--accent3);border:1px solid rgba(79,247,160,0.35);border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">
+          ⊕ Add All Items
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CAMERA SCANNER MODAL ══ -->
+  <input type="file" id="scan-file-input" accept="image/*" capture="environment"
+    style="display:none" onchange="handleScanCapture(event)">
+  <div id="scanner-modal">
+    <div style="width:100%;max-width:520px;padding:0 16px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;gap:12px;">
+      <img id="scan-preview" alt="Captured photo">
+      <div id="scan-status" style="font-size:12px;color:rgba(255,255,255,0.55);min-height:18px;font-family:var(--font-mono);text-align:center;">Tap the camera button to scan</div>
+      <div style="display:flex;gap:8px;align-items:center;width:100%;">
+        <input id="scan-manual-input" type="text" placeholder="Type barcode manually"
+          oninput="onScanManualInput()"
+          onkeydown="if(event.key==='Enter'&&this.value.trim())confirmScan()"
+          style="flex:1;padding:10px 14px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-family:var(--font-mono);font-size:14px;color:#fff;outline:none;"
+          onfocus="this.style.borderColor='#4ff7a0'" onblur="this.style.borderColor='rgba(255,255,255,0.2)'">
+        <button id="scan-confirm-btn" onclick="confirmScan()" disabled
+          style="padding:10px 18px;background:rgba(79,247,160,0.2);border:1px solid rgba(79,247,160,0.4);border-radius:8px;color:#4ff7a0;font-family:var(--font-ui);font-size:14px;font-weight:700;cursor:pointer;opacity:0.4;white-space:nowrap;">
+          Use ✓
+        </button>
+      </div>
+      <div style="display:flex;gap:10px;width:100%;justify-content:center;">
+        <button onclick="document.getElementById('scan-file-input').click()"
+          style="padding:10px 22px;background:rgba(79,247,160,0.15);border:1px solid rgba(79,247,160,0.35);border-radius:8px;color:#4ff7a0;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">
+          📷 Camera
+        </button>
+        <button onclick="closeScanner()"
+          style="padding:10px 22px;border:1px solid rgba(255,255,255,0.2);border-radius:8px;background:transparent;color:rgba(255,255,255,0.6);cursor:pointer;font-size:13px;font-family:var(--font-ui);">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PRICEBOOK PROMPT MODAL ══ -->
+  <div id="pb-prompt-modal">
+    <div id="pb-prompt-inner">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div>
+          <div style="font-size:15px;font-weight:700">Add to Pricebook?</div>
+          <div id="pbp-subtitle" style="font-size:11px;color:var(--text-muted);margin-top:3px;font-family:var(--font-mono);"></div>
+        </div>
+        <button onclick="cancelPBPrompt()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div style="flex:1;">
+            <label class="fl">Category <span style="color:var(--accent4)">*</span></label>
+            <div class="ac-wrap" style="position:relative;">
+              <input class="ac-input" id="pbp-cat" type="text" placeholder="Type to search…"
+                autocomplete="off" oninput="pbpCatInput()" onfocus="pbpCatFocus()" onkeydown="pbpCatKey(event)">
+              <div class="ac-dropdown" id="dd-pbp-cat"></div>
+            </div>
+          </div>
+          <div style="flex:0 0 160px;">
+            <label class="fl">SKU <span style="color:var(--text-dim);font-size:8px">(auto)</span></label>
+            <input class="plain-input" id="pbp-sku" type="text" readonly placeholder="—"
+              style="color:var(--accent);font-family:var(--font-mono);font-size:11px;background:var(--surface3)">
+          </div>
+        </div>
+        <details style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;">
+          <summary style="cursor:pointer;font-size:12px;color:var(--text-muted);font-weight:600;list-style:none;">
+            ▸ Optional details (subcategory, pricing, URL)
+          </summary>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+            <div>
+              <label class="fl">Subcategory</label>
+              <input class="plain-input" id="pbp-subcat" type="text" placeholder="Optional">
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              <div style="flex:1;min-width:100px;">
+                <label class="fl">Unit Cost</label>
+                <input class="plain-input" id="pbp-cost" type="number" min="0" step="0.01" placeholder="0.00">
+              </div>
+              <div style="flex:1;min-width:100px;">
+                <label class="fl">Unit Price</label>
+                <input class="plain-input" id="pbp-price" type="number" min="0" step="0.01" placeholder="0.00">
+              </div>
+              <div style="flex:1;min-width:100px;">
+                <label class="fl">MSRP</label>
+                <input class="plain-input" id="pbp-msrp" type="number" min="0" step="0.01" placeholder="0.00">
+              </div>
+            </div>
+            <div>
+              <label class="fl">Product URL</label>
+              <input class="plain-input" id="pbp-url" type="url" placeholder="https://…">
+            </div>
+          </div>
+        </details>
+        <div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px;">
+          <button onclick="skipPBPrompt()" class="btn btn-ghost" style="font-size:13px;">
+            Skip — add without SKU
+          </button>
+          <button id="pbp-btn-confirm" onclick="confirmPBPrompt()" disabled
+            style="padding:8px 18px;background:rgba(79,247,160,0.15);color:var(--accent3);border:1px solid rgba(79,247,160,0.35);border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;opacity:0.5;">
+            ◈ Add to Pricebook + save item
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PRODUCT BOOK PAGE ══ -->
+  <div class="page" id="page-pb">
+    <div id="pb-content" style="flex:1;flex-direction:column;overflow:hidden;display:flex;">
+      <div class="page-toolbar">
+        <div class="stat-chip" id="pb-chip-total">0 <span>products</span></div>
+        <div class="stat-chip" id="pb-chip-mfg">0 <span>manufacturers</span></div>
+        <div class="stat-chip" id="pb-chip-cats">0 <span>categories</span></div>
+        <div class="search-wrap">
+          <span style="color:var(--text-dim);font-size:12px">⌕</span>
+          <input type="text" placeholder="Search product book…" oninput="filterPB(this.value)">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable mobile-hide" onclick="setSort('pb','sku')">SKU</th>
+            <th class="sortable" onclick="setSort('pb','manufacturer')">Manufacturer</th>
+            <th class="sortable" onclick="setSort('pb','model')">Model</th>
+            <th class="sortable mobile-hide" onclick="setSort('pb','category')">Category</th>
+            <th class="sortable mobile-hide" onclick="setSort('pb','msrp')">MSRP</th>
+            <th class="sortable" onclick="setSort('pb','unitCost')">Cost</th>
+            <th class="sortable mobile-hide" onclick="setSort('pb','unitPrice')">Price</th>
+            <th style="width:32px"></th>
+          </tr></thead>
+          <tbody id="pb-tbody"></tbody>
+        </table>
+      </div>
+      <div id="pb-pagination" style="display:none;align-items:center;justify-content:center;gap:14px;padding:7px 16px;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;">
+        <button class="btn btn-ghost" id="pb-pag-prev" onclick="pbPagPrev()" style="padding:4px 12px;font-size:12px;">← Prev</button>
+        <span id="pb-pag-info" style="font-size:12px;color:var(--text-muted);"></span>
+        <button class="btn btn-ghost" id="pb-pag-next" onclick="pbPagNext()" style="padding:4px 12px;font-size:12px;">Next →</button>
+      </div>
+      <div class="add-bar">
+        <div class="form-row">
+          <div class="fg fw-pb-mfg">
+            <label class="fl">Manufacturer <span style="color:var(--accent4);font-size:8px">*</span></label>
+            <div class="ac-wrap">
+              <input class="ac-input" id="pb-mfg" type="text" placeholder="Existing or new…"
+                     autocomplete="off" oninput="acFilter('pb','mfg')" onclick="acOpen('pb','mfg')" onkeydown="acKey(event,'pb','mfg')">
+              <div class="ac-dropdown" id="dd-pb-mfg"></div>
+            </div>
+          </div>
+          <div class="fg fw-pb-mod">
+            <label class="fl">Model <span style="color:var(--accent4);font-size:8px">*</span></label>
+            <div class="ac-wrap">
+              <input class="ac-input" id="pb-model" type="text" placeholder="Model name or part number"
+                     autocomplete="off" oninput="pbModelInput()" onfocus="pbModelFocus()" onkeydown="acKey(event,'pb','model')">
+              <div class="ac-dropdown" id="dd-pb-model"></div>
+            </div>
+          </div>
+          <div class="fg fw-pb-cat">
+            <label class="fl">Category <span style="color:var(--accent4);font-size:8px">*</span></label>
+            <div class="ac-wrap">
+              <input class="ac-input" id="pb-cat" type="text" placeholder="Type to search…"
+                     autocomplete="off" oninput="acFilter('pb','cat')" onfocus="acOpen('pb','cat')" onkeydown="acKey(event,'pb','cat')">
+              <div class="ac-dropdown" id="dd-pb-cat"></div>
+            </div>
+          </div>
+          <div class="fg fw-pb-sub">
+            <label class="fl">Subcategory</label>
+            <input class="plain-input" id="pb-sub" type="text" placeholder="Optional">
+          </div>
+          <div class="fg fw-pb-sku">
+            <label class="fl">SKU <span style="color:var(--text-dim);font-size:8px;letter-spacing:0">(auto-generated)</span></label>
+            <input class="plain-input" id="pb-sku" type="text" placeholder="—" readonly
+                   style="color:var(--accent);font-family:var(--font-mono);font-size:11px;background:var(--surface3)">
+          </div>
+          <div class="fg fw-pb-msrp">
+            <label class="fl">MSRP ($)</label>
+            <input class="plain-input" id="pb-msrp" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="fg fw-pb-cost">
+            <label class="fl">Unit Cost ($)</label>
+            <input class="plain-input" id="pb-cost" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="fg fw-pb-price">
+            <label class="fl">Unit Price ($)</label>
+            <input class="plain-input" id="pb-price" type="number" min="0" step="0.01" placeholder="0.00">
+          </div>
+          <div class="fg fw-pb-url">
+            <label class="fl">URL</label>
+            <input class="plain-input" id="pb-url" type="text" placeholder="Optional">
+          </div>
+          <button class="btn-add" id="pb-btn-add" onclick="addPBItem()" disabled>Add to Book</button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text-dim)">
+          SKU is auto-generated from category + manufacturer codes. You can type a new manufacturer — it will be added and assigned a code automatically.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PROJECTS PAGE ══ -->
+  <div class="page" id="page-proj">
+    <div id="proj-content" style="flex:1;flex-direction:column;overflow:hidden;display:flex;">
+
+      <!-- Project list view -->
+      <div id="proj-list-view" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="page-toolbar">
+          <div style="display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:2px;margin-right:6px;">
+            <button id="ptype-all" onclick="setProjTypeFilter('all')" style="border:none;background:var(--accent);color:#fff;font-family:var(--font-ui);font-size:11px;font-weight:600;padding:4px 12px;border-radius:4px;cursor:pointer;">All</button>
+            <button id="ptype-job" onclick="setProjTypeFilter('job')" style="border:none;background:transparent;color:var(--text-muted);font-family:var(--font-ui);font-size:11px;font-weight:600;padding:4px 12px;border-radius:4px;cursor:pointer;">Jobs</button>
+            <button id="ptype-stock" onclick="setProjTypeFilter('stock')" style="border:none;background:transparent;color:var(--text-muted);font-family:var(--font-ui);font-size:11px;font-weight:600;padding:4px 12px;border-radius:4px;cursor:pointer;">Stock</button>
+            <button id="ptype-outbound" onclick="setProjTypeFilter('outbound')" style="border:none;background:transparent;color:var(--text-muted);font-family:var(--font-ui);font-size:11px;font-weight:600;padding:4px 12px;border-radius:4px;cursor:pointer;">Outbound</button>
+          </div>
+          <div class="stat-chip" id="proj-chip-total">0 <span>projects</span></div>
+          <div class="stat-chip" id="proj-chip-open">0 <span>open</span></div>
+          <div class="stat-chip" id="proj-chip-inprog">0 <span>in progress</span></div>
+          <div class="stat-chip" id="proj-chip-done">0 <span>complete</span></div>
+          <label style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-muted);cursor:pointer;white-space:nowrap;" title="Empty projects (no scope, inventory, or POs) are hidden by default. They still appear in the Front Desk tree.">
+            <input type="checkbox" id="proj-show-empty" onchange="projShowEmpty=this.checked;renderProjTable();updateProjStats();" style="cursor:pointer;">
+            Show empty <span id="proj-empty-count" style="color:var(--text-dim);"></span>
+          </label>
+          <div class="search-wrap">
+            <span style="color:var(--text-dim);font-size:12px">⌕</span>
+            <input type="text" placeholder="Search projects…" oninput="filterProjects(this.value)">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th class="sortable" onclick="setSort('proj','name')">Project Name</th>
+              <th class="sortable mobile-hide" onclick="setSort('proj','client')">Client</th>
+              <th class="mobile-hide">Location</th>
+              <th class="sortable" style="width:100px" onclick="setSort('proj','status')">Status</th>
+              <th class="sortable mobile-hide" onclick="setSort('proj','contractValue')">Contract Value</th>
+              <th class="sortable mobile-hide" onclick="setSort('proj','startDate')">Start</th>
+              <th class="sortable mobile-hide" onclick="setSort('proj','targetDate')">Target</th>
+              <th class="sortable" onclick="setSort('proj','items')">Items</th>
+              <th style="width:36px"></th>
+            </tr></thead>
+            <tbody id="proj-tbody"></tbody>
+          </table>
+        </div>
+        <div class="add-bar">
+          <div class="form-row">
+            <div class="fg" style="display:none">
+              <input class="plain-input" id="proj-id" type="text" placeholder="—" readonly>
+            </div>
+            <div class="fg" style="flex:0 0 180px">
+              <label class="fl">Project Name <span style="color:var(--accent4);font-size:8px">*</span></label>
+              <input class="plain-input" id="proj-name" type="text" placeholder="e.g. Job name" oninput="projCheckReady()">
+            </div>
+              <div class="fg" style="flex:0 0 160px"><label class="fl">Client</label>
+                <select class="plain-select" id="proj-client">
+                  <option value="">— No client —</option>
+                </select>
+              </div>
+            <div class="fg" style="flex:0 0 130px">
+              <label class="fl">Client First Name</label>
+              <input class="plain-input" id="proj-first" type="text" placeholder="First">
+            </div>
+            <div class="fg" style="flex:0 0 130px">
+              <label class="fl">Client Last Name</label>
+              <input class="plain-input" id="proj-last" type="text" placeholder="Last">
+            </div>
+            <div class="fg" style="flex:0 0 200px">
+              <label class="fl">Address</label>
+              <input class="plain-input" id="proj-addr" type="text" placeholder="Street address">
+            </div>
+            <div class="fg" style="flex:0 0 130px">
+              <label class="fl">Phone</label>
+              <input class="plain-input" id="proj-phone" type="text" placeholder="Optional">
+            </div>
+            <div class="fg" style="flex:0 0 160px">
+              <label class="fl">Email</label>
+              <input class="plain-input" id="proj-email" type="text" placeholder="Optional">
+            </div>
+            <div class="fg" style="flex:0 0 100px">
+              <label class="fl">Status</label>
+              <select class="plain-select" id="proj-status">
+                <option>Open</option><option>In Progress</option><option>Complete</option>
+              </select>
+            </div>
+            <div class="fg" style="flex:0 0 110px">
+              <label class="fl">Contract Value ($)</label>
+              <input class="plain-input" id="proj-value" type="number" min="0" step="0.01" placeholder="0.00">
+            </div>
+            <div class="fg" style="flex:0 0 120px">
+              <label class="fl">Start Date</label>
+              <input class="plain-input" id="proj-start" type="date">
+            </div>
+            <div class="fg" style="flex:0 0 120px">
+              <label class="fl">Target Completion</label>
+              <input class="plain-input" id="proj-target" type="date">
+            </div>
+            <div class="fg" style="flex:1;min-width:120px">
+              <label class="fl">Notes</label>
+              <input class="plain-input" id="proj-notes" type="text" placeholder="Optional">
+            </div>
+            <button class="btn-add" id="proj-btn-add" onclick="addProject()" disabled>Add Project</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Project detail view (hidden until project clicked) -->
+      <div id="proj-detail-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+        <!-- Detail header -->
+        <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap;">
+          <button class="btn btn-ghost" onclick="projDetailBack()" style="padding:6px 12px;font-size:12px;">← Back</button>
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span id="det-id" style="display:none"></span>
+              <span id="det-name" style="font-size:16px;font-weight:700;"></span>
+              <span id="det-status-badge"></span>
+            </div>
+            <div id="det-client" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:16px;text-align:right;align-items:center;">
+            <div>
+              <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Contract</div>
+              <div id="det-contract" style="font-family:var(--font-mono);font-size:14px;color:var(--accent3)"></div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Project Cost</div>
+              <div id="det-cost" style="font-family:var(--font-mono);font-size:14px;color:var(--accent2)"></div>
+            </div>
+            <div>
+              <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Client Price</div>
+              <div id="det-price" style="font-family:var(--font-mono);font-size:14px;color:var(--accent3)"></div>
+            </div>
+            <div id="det-breakdown" style="display:flex;gap:8px;align-items:center;"></div>
+          </div>
+          <button class="btn btn-ghost" onclick="editProject(currentProjectId)" style="padding:6px 12px;font-size:12px;">✎ Edit</button>
+          <button class="btn" onclick="openNewPOFromProject(currentProjectId)"
+                  style="padding:6px 12px;font-size:12px;background:rgba(79,142,247,0.1);color:var(--accent);border:1px solid rgba(79,142,247,0.25);">+ New PO</button>
+          <button class="btn btn-ghost" onclick="openReassignScope(currentProjectId)" style="padding:6px 12px;font-size:12px;" title="Move scope lines into sibling projects">⇄ Reassign Items</button>
+          <button class="btn btn-ghost" onclick="exportScopeInvoice(currentProjectId)" style="padding:6px 12px;font-size:12px;">🧾 Export Invoice</button>
+          <button class="btn btn-ghost" onclick="exportPalletManifest(currentProjectId)" style="padding:6px 12px;font-size:12px;">📦 Pallet Manifest</button>
+          <button class="btn" id="proj-mark-shipped-btn" onclick="markPalletShipped(currentProjectId)" style="display:none;padding:6px 12px;font-size:12px;background:rgba(79,247,160,0.12);color:var(--accent3);border:1px solid rgba(79,247,160,0.3);">🚚 Mark Shipped</button>
+          <button class="btn" onclick="deleteProject(currentProjectId)"
+                  style="padding:6px 12px;font-size:12px;background:rgba(247,79,126,0.1);color:var(--accent4);border:1px solid rgba(247,79,126,0.25);">✕ Delete</button>
+        </div>
+
+        <!-- Sub-tabs -->
+        <div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 24px;flex-shrink:0;">
+          <div id="ptab-scope" onclick="setProjDetailTab('scope')"
+            style="padding:10px 18px;font-size:12px;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;margin-bottom:-1px;">Scope</div>
+          <div id="ptab-pos" onclick="setProjDetailTab('pos')"
+            style="padding:10px 18px;font-size:12px;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-1px;">Purchase Orders</div>
+        </div>
+
+        <!-- SCOPE TAB -->
+        <div id="proj-scope-tab" style="flex:1;display:flex;flex-direction:column;overflow:visible;min-height:0;">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:0 0 8px;">
+            <input id="scope-search" type="text" placeholder="Filter scope — SKU, manufacturer, model, notes…" oninput="setScopeSearch(this.value)"
+              style="flex:1;min-width:180px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 9px;font-size:12px;outline:none;">
+            <select id="scope-cat-filter" onchange="setScopeCat(this.value)" title="Filter by category"
+              style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:6px 8px;font-size:12px;outline:none;">
+              <option value="">All categories</option>
+            </select>
+            <button class="btn btn-ghost" onclick="clearScopeFilters()" style="font-size:12px;padding:6px 10px;">Clear</button>
+            <span id="scope-filter-count" style="font-size:11px;color:var(--text-dim);"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th style="width:24px"></th>
+                <th class="sortable" onclick="setSort('projItems','sku')">SKU</th>
+                <th class="sortable" onclick="setSort('projItems','manufacturer')">Manufacturer</th>
+                <th class="sortable" onclick="setSort('projItems','model')">Model</th>
+                <th class="sortable" style="width:70px" onclick="setSort('projItems','qty')">Qty Needed</th>
+                <th class="sortable" style="width:100px" onclick="setSort('projItems','qtyOnPO')">On PO</th>
+                <th class="sortable" style="width:100px" onclick="setSort('projItems','qtyReceived')">Received</th>
+                <th class="sortable" style="width:100px" onclick="setSort('projItems','filled')">Filled</th>
+                <th class="sortable" style="width:100px" onclick="setSort('projItems','itemStatus')">Status</th>
+                <th class="sortable" style="width:110px" onclick="setSort('projItems','unitCost')">Unit Cost</th>
+                <th class="sortable" style="width:110px" onclick="setSort('projItems','unitPrice')">Unit Price</th>
+                <th class="sortable" style="width:110px" onclick="setSort('projItems','lineTotal')">Line Total</th>
+                <th>PO #</th>
+                <th style="width:120px">Inv Status</th>
+                <th class="sortable" onclick="setSort('projItems','notes')">Notes</th>
+                <th style="width:56px"></th>
+              </tr></thead>
+              <tbody id="scope-tbody"></tbody>
+            </table>
+          </div>
+          <!-- Add scope item form -->
+          <div class="add-bar">
+            <div class="form-row">
+              <div class="fg" style="flex:0 0 180px"><label class="fl">Manufacturer</label>
+                <div class="ac-wrap">
+                  <input class="ac-input" id="si-mfg" type="text" placeholder="Type to search…"
+                         autocomplete="off" oninput="acFilter('si','mfg')" onfocus="acOpen('si','mfg')" onkeydown="acKey(event,'si','mfg')">
+                  <div class="ac-dropdown" id="dd-si-mfg"></div>
+                </div>
+              </div>
+              <div class="fg" style="flex:0 0 230px"><label class="fl">Model</label>
+                <div class="ac-wrap">
+                  <input class="ac-input" id="si-model" type="text" placeholder="Select manufacturer first…"
+                         autocomplete="off" oninput="acFilter('si','model')" onfocus="acFilter('si','model')" onkeydown="acKey(event,'si','model')" disabled>
+                  <div class="ac-dropdown" id="dd-si-model"></div>
+                </div>
+              </div>
+              <div class="fg" style="flex:0 0 120px"><label class="fl">SKU <span style="color:var(--text-dim);font-size:8px">(auto)</span></label>
+                <input class="plain-input" id="si-sku" type="text" readonly placeholder="—"
+                       style="color:var(--accent);font-family:var(--font-mono);font-size:11px;background:var(--surface3)">
+              </div>
+              <div class="fg" style="flex:0 0 68px"><label class="fl">Qty</label>
+                <input class="plain-input" id="si-qty" type="number" min="1" value="1">
+              </div>
+              <div class="fg" style="flex:0 0 100px"><label class="fl">Unit Cost ($)</label>
+                <input class="plain-input" id="si-cost" type="number" min="0" step="0.01" placeholder="—">
+              </div>
+              <div class="fg" style="flex:0 0 100px"><label class="fl">Unit Price ($)</label>
+                <input class="plain-input" id="si-price" type="number" min="0" step="0.01" placeholder="—">
+              </div>
+              <div class="fg" style="flex:1;min-width:120px"><label class="fl">Notes</label>
+                <input class="plain-input" id="si-notes" type="text" placeholder="Optional">
+              </div>
+              <button class="btn-add" id="si-btn-add" onclick="addScopeItem()" disabled>Add to Scope</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PURCHASE ORDERS TAB -->
+        <div id="proj-pos-tab" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th class="sortable" onclick="setSort('projPOs','poNumber')">PO #</th>
+                <th class="sortable" onclick="setSort('projPOs','vendor')">Vendor</th>
+                <th class="sortable" onclick="setSort('projPOs','status')">Status</th>
+                <th class="sortable" onclick="setSort('projPOs','date')">Date</th>
+                <th class="sortable" onclick="setSort('projPOs','totalValue')">Total</th>
+                <th class="sortable" onclick="setSort('projPOs','items')">Items</th>
+                <th>Scope</th>
+                <th style="width:36px"></th>
+              </tr></thead>
+              <tbody id="proj-pos-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Project Modal -->
+  <div id="proj-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:15px;font-weight:700;">Edit Project</div>
+        <button onclick="closeProjModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:18px 24px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Project Name</label><input class="plain-input" id="edit-proj-name" type="text"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Client</label>
+          <select class="plain-select" id="edit-proj-client">
+            <option value="">— No client —</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Client First Name</label><input class="plain-input" id="edit-proj-first" type="text"></div>
+        <div class="fg"><label class="fl">Client Last Name</label><input class="plain-input" id="edit-proj-last" type="text"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Address</label><input class="plain-input" id="edit-proj-addr" type="text"></div>
+        <div class="fg"><label class="fl">Phone</label><input class="plain-input" id="edit-proj-phone" type="text"></div>
+        <div class="fg"><label class="fl">Email</label><input class="plain-input" id="edit-proj-email" type="text"></div>
+        <div class="fg"><label class="fl">Status</label>
+          <select class="plain-select" id="edit-proj-status">
+            <option>Open</option><option>In Progress</option><option>Complete</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Contract Value ($)</label><input class="plain-input" id="edit-proj-value" type="number" min="0" step="0.01"></div>
+        <div class="fg"><label class="fl">Start Date</label><input class="plain-input" id="edit-proj-start" type="date"></div>
+        <div class="fg"><label class="fl">Target Completion</label><input class="plain-input" id="edit-proj-target" type="date"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Notes</label><input class="plain-input" id="edit-proj-notes" type="text"></div>
+      </div>
+      <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeProjModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="saveEditProject()" class="btn btn-primary" style="background:var(--accent);color:#fff;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ORDERS PAGE ══ -->
+  <div class="page" id="page-orders">
+    <div id="orders-content" style="flex:1;flex-direction:column;overflow:hidden;display:flex;">
+
+      <!-- Sub-tabs: All / Backorders -->
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px;flex-shrink:0;background:var(--surface);">
+        <div class="tab-btn active" id="otab-all" onclick="setOrdersTab('all',this)" style="padding:11px 18px;font-size:12px;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;margin-bottom:-1px;">All Orders</div>
+        <div class="tab-btn" id="otab-backorder" onclick="setOrdersTab('backorder',this)" style="padding:11px 18px;font-size:12px;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-1px;">Backordered</div>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:10px;padding:8px 0;"></div>
+      </div>
+
+      <!-- Orders list + detail split -->
+      <div id="orders-list-view" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="page-toolbar">
+          <div class="stat-chip active" id="o-chip-all" onclick="setOrdersStatFilter(null)" style="cursor:pointer">All</div>
+          <div class="stat-chip" id="o-chip-total">0 <span>POs</span></div>
+          <div class="stat-chip" id="o-chip-submitted" onclick="setOrdersStatFilter('submitted')" style="cursor:pointer">0 <span>submitted</span></div>
+          <div class="stat-chip" id="o-chip-draft" onclick="setOrdersStatFilter('draft')" style="cursor:pointer">0 <span>draft</span></div>
+          <div class="stat-chip" id="o-chip-partial" onclick="setOrdersStatFilter('backordered')" style="cursor:pointer">0 <span>backordered</span></div>
+          <div class="stat-chip" id="o-chip-received" onclick="setOrdersStatFilter('received')" style="cursor:pointer">0 <span>received</span></div>
+          <div class="search-wrap">
+            <span style="color:var(--text-dim);font-size:12px">⌕</span>
+            <input type="text" placeholder="Search orders…" oninput="filterOrders(this.value)">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th class="sortable" onclick="setSort('orders','poNumber')">PO #</th>
+              <th class="sortable" onclick="setSort('orders','vendor')">Vendor</th>
+              <th class="sortable mobile-hide" onclick="setSort('orders','projectName')">Project</th>
+              <th class="sortable" style="width:100px" onclick="setSort('orders','status')">Status</th>
+              <th class="sortable mobile-hide" onclick="setSort('orders','date')">Date</th>
+              <th class="sortable" onclick="setSort('orders','totalValue')">Total Value</th>
+              <th class="sortable" onclick="setSort('orders','items')">Items</th>
+              <th style="width:36px"></th>
+            </tr></thead>
+            <tbody id="orders-tbody"></tbody>
+          </table>
+        </div>
+        <!-- New PO form -->
+        <div class="add-bar">
+          <div class="form-row">
+            <div class="fg" style="flex:0 0 100px"><label class="fl">PO Number <span style="color:var(--accent4);font-size:8px">*</span></label><input class="plain-input" id="po-num" type="text" placeholder="2574" oninput="poCheckReady()"></div>
+            <div class="fg" style="flex:0 0 160px"><label class="fl">Vendor <span style="color:var(--accent4);font-size:8px">*</span></label>
+              <div class="ac-wrap">
+                <select class="plain-select" id="po-vendor" style="width:100%;" onchange="vendorSelectChanged(this)"></select>
+              </div>
+            </div>
+            <div class="fg" style="flex:0 0 150px">
+              <label class="fl">Project (optional)</label>
+              <div class="ac-wrap">
+                <input class="ac-input" id="po-project" type="text" placeholder="Type project name…" autocomplete="off" oninput="acFilter('po','project')" onfocus="acOpen('po','project')" onkeydown="acKey(event,'po','project')">
+                <div class="ac-dropdown" id="dd-po-project"></div>
+              </div>
+            </div>
+            <div class="fg" style="flex:0 0 100px"><label class="fl">Status</label>
+              <select class="plain-select" id="po-status"><option>Draft</option><option selected>Submitted</option><option>Backorder</option><option>Received</option><option>Cancelled</option></select>
+            </div>
+            <div class="fg" style="flex:0 0 120px"><label class="fl">Date</label><input class="plain-input" id="po-date" type="date"></div>
+            <div class="fg" style="flex:0 0 130px"><label class="fl">Shipment</label><input class="plain-input" id="po-ship" type="text" placeholder="Ground"></div>
+            <div class="fg" style="flex:1;min-width:100px"><label class="fl">Notes</label><input class="plain-input" id="po-notes" type="text" placeholder="Optional"></div>
+            <button class="btn-add" id="po-btn-add" onclick="addPO()" disabled>Create PO</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PO detail view -->
+      <div id="orders-detail-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+        <div id="po-det-header" style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;">
+          <button class="btn btn-ghost" onclick="poDetailBack()" style="padding:6px 12px;font-size:12px;">← Back</button>
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span id="po-det-num" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent)"></span>
+              <span id="po-det-vendor" style="font-size:14px;font-weight:600;"></span>
+              <span id="po-det-status-badge"></span>
+            </div>
+            <div id="po-det-meta" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+            <div id="po-det-ship-addr" style="font-size:11px;color:var(--text-dim);margin-top:2px;font-family:var(--font-mono);"></div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:16px;text-align:right;">
+            <div><div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Subtotal</div><div id="po-det-subtotal" style="font-family:var(--font-mono);font-size:14px;color:var(--accent3)"></div></div>
+            <div><div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Est. Resale</div><div id="po-det-resale" style="font-family:var(--font-mono);font-size:14px;color:var(--accent)"></div></div>
+            <div><div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Tax</div><div id="po-det-tax" style="font-family:var(--font-mono);font-size:14px;color:var(--text-muted)"></div></div>
+            <div><div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Tariff</div><div id="po-det-tariff" style="font-family:var(--font-mono);font-size:14px;color:var(--text-muted)"></div></div>
+            <div><div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Shipping</div><div id="po-det-shipping" style="font-family:var(--font-mono);font-size:14px;color:var(--text-muted)"></div></div>
+            <div><div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Discount</div><div id="po-det-discount" style="font-family:var(--font-mono);font-size:14px;color:var(--text-muted)"></div></div>
+            <div id="po-det-others" style="display:contents;"></div>
+            <div style="border-left:1px solid var(--border);padding-left:16px;"><div style="font-size:10px;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">Grand Total</div><div id="po-det-grand" style="font-family:var(--font-mono);font-size:14px;color:var(--accent3)"></div></div>
+          </div>
+          <button class="btn btn-ghost" onclick="openEditPOModal(currentPONum)" style="padding:6px 12px;font-size:12px;">✎ Edit PO</button>
+          <button class="btn" id="po-receive-btn" onclick="openReceiveModal()"
+            style="padding:7px 14px;font-size:12px;font-weight:600;background:rgba(79,247,160,0.1);color:var(--accent3);border:1px solid rgba(79,247,160,0.25);">📦 Receive Shipment</button>
+          <button class="btn btn-ghost" onclick="exportPOtoPDF(currentPONum)" style="padding:7px 14px;font-size:12px;font-weight:600;">🖨 Export PDF</button>
+          <button class="btn btn-ghost" onclick="openPickListPicker(currentPONum)" style="padding:7px 14px;font-size:12px;font-weight:600;" title="Pick list for installers — choose items; quantities + serials, no pricing">🖨 Export PDF (No Prices)</button>
+          <button class="btn btn-ghost" onclick="deleteOrder(currentPONum)" style="padding:6px 12px;font-size:12px;color:var(--accent4);border-color:rgba(247,79,126,0.3);">✕ Delete</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>SKU</th><th>Model / Description</th>
+              <th style="width:80px">Qty Ord.</th><th style="width:80px">Qty Rec.</th>
+              <th style="width:80px">Outstanding</th>
+              <th style="width:110px">Unit Price</th><th style="width:100px">Discount ($)</th><th>Line Total</th>
+              <th style="width:100px">Status</th><th style="width:140px">Date Received</th><th style="width:60px"></th>
+            </tr></thead>
+            <tbody id="po-items-tbody"></tbody>
+          </table>
+        </div>
+        <!-- Shipments section -->
+        <div id="po-shipments-section" style="border-top:1px solid var(--border);padding:14px 24px;flex-shrink:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <span style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted)">Shipments</span>
+            <button class="btn btn-ghost" onclick="openAddShipmentModal()" style="padding:4px 10px;font-size:11px;">+ Log Shipment</button>
+          </div>
+          <div id="po-shipments-list"></div>
+        </div>
+        <!-- Add line item to PO -->
+        <div class="add-bar">
+          <div class="form-row">
+            <div class="fg" style="flex:0 0 180px"><label class="fl">Manufacturer</label>
+              <div class="ac-wrap">
+                <input class="ac-input" id="poi-mfg" type="text" placeholder="Type to search…" autocomplete="off" oninput="acFilter('poi','mfg')" onfocus="acOpen('poi','mfg')" onkeydown="acKey(event,'poi','mfg')">
+                <div class="ac-dropdown" id="dd-poi-mfg"></div>
+              </div>
+            </div>
+            <div class="fg" style="flex:0 0 230px"><label class="fl">Model</label>
+              <div class="ac-wrap">
+                <input class="ac-input" id="poi-model" type="text" placeholder="Select manufacturer first…" autocomplete="off" oninput="acFilter('poi','model')" onfocus="acOpen('poi','model')" onkeydown="acKey(event,'poi','model')" disabled>
+                <div class="ac-dropdown" id="dd-poi-model"></div>
+              </div>
+            </div>
+            <div class="fg" style="flex:0 0 130px"><label class="fl">SKU <span style="color:var(--text-dim);font-size:8px;letter-spacing:0">(auto)</span></label>
+              <input class="plain-input" id="poi-sku" type="text" placeholder="—" readonly style="color:var(--accent);font-family:var(--font-mono);font-size:11px;background:var(--surface3)">
+            </div>
+            <div class="fg" style="flex:0 0 60px"><label class="fl">Qty</label><input class="plain-input" id="poi-qty" type="number" min="1" value="1"></div>
+            <div class="fg" style="flex:0 0 100px"><label class="fl">Unit Price ($)</label><input class="plain-input" id="poi-price" type="number" min="0" step="0.01" placeholder="0.00"></div>
+            <div class="fg" style="flex:0 0 100px"><label class="fl">Discount ($)</label><input class="plain-input" id="poi-discount" type="number" min="0" step="0.01" placeholder="0.00"></div>
+            <div class="fg" style="flex:1;min-width:100px"><label class="fl">Notes</label><input class="plain-input" id="poi-notes" type="text" placeholder="Optional"></div>
+            <button class="btn-add" id="poi-btn-add" onclick="addPOItem()" disabled>Add Item</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inventory Item Detail (mobile popup) -->
+  <div id="inv-detail-modal" onclick="if(event.target===this)closeInvModal()" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.55);align-items:flex-end;justify-content:center;">
+    <div style="background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:82vh;overflow-y:auto;padding:0 0 40px;">
+      <div style="width:36px;height:4px;background:var(--border-bright);border-radius:2px;margin:12px auto 0;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:14px 16px 0;">
+        <div>
+          <div id="inv-modal-mfg" style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;text-transform:uppercase;"></div>
+          <div id="inv-modal-model" style="font-size:17px;font-weight:700;line-height:1.2;"></div>
+          <div id="inv-modal-sku" style="font-size:10px;color:var(--accent);font-family:var(--font-mono);margin-top:3px;"></div>
+        </div>
+        <button onclick="closeInvModal()" style="background:none;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:0 0 0 16px;line-height:1;">✕</button>
+      </div>
+      <div id="inv-modal-body" style="padding:14px 16px 0;"></div>
+    </div>
+  </div>
+
+  <!-- Receive Shipment Modal -->
+  <div id="receive-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:620px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:15px;font-weight:700;">Receive Shipment</div>
+        <button onclick="closeReceiveModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:16px 24px;font-size:12px;color:var(--text-muted)">Enter the quantity received for each line item. Leave at 0 if not yet received.</div>
+      <div id="receive-items" style="padding:0 24px 16px;"></div>
+      <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeReceiveModal()" class="btn btn-ghost">Cancel</button>
+        <button id="receive-confirm-btn" onclick="advanceReceive()" class="btn" style="background:var(--accent3);color:var(--bg);font-weight:700;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;cursor:pointer;">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log Shipment Modal -->
+  <div id="shipment-modal" onclick="if(event.target===this)closeShipmentModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:640px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div id="shipment-modal-title" style="font-size:15px;font-weight:700;">Log Shipment</div>
+        <button onclick="closeShipmentModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:16px 24px 8px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <label class="fl">Carrier</label>
+          <select class="plain-select" id="sm-carrier" style="width:100%;" onchange="smCarrierChange()">
+            <option value="">— Select carrier —</option>
+            <option>UPS</option>
+            <option>FedEx</option>
+            <option>USPS</option>
+            <option>DHL</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label class="fl">Tracking Number</label>
+          <input class="plain-input" id="sm-tracking" type="text" placeholder="1Z…" style="width:100%;" oninput="smCarrierChange()">
+        </div>
+        <div>
+          <label class="fl">Est. Delivery</label>
+          <input class="plain-input" id="sm-eta" type="date" style="width:100%;">
+        </div>
+        <div>
+          <label class="fl">Status</label>
+          <select class="plain-select" id="sm-status" style="width:100%;">
+            <option>In Transit</option>
+            <option>Delivered</option>
+            <option>Exception</option>
+          </select>
+        </div>
+        <div style="grid-column:1/-1;">
+          <label class="fl">Notes</label>
+          <input class="plain-input" id="sm-notes" type="text" placeholder="Packing slip #, vendor ref, etc." style="width:100%;">
+        </div>
+        <div id="sm-tracking-link-row" style="grid-column:1/-1;display:none;">
+          <a id="sm-tracking-link" href="#" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent);font-family:var(--font-mono);">🔗 Track this shipment</a>
+        </div>
+      </div>
+      <div style="padding:4px 24px 8px;">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px;">Items in this shipment</div>
+        <div id="sm-items-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+      <div style="padding:12px 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeShipmentModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="saveShipment()" class="btn" style="background:var(--accent);color:#fff;font-weight:700;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;cursor:pointer;">Save Shipment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Un-receive Modal -->
+  <div id="unreceive-modal" onclick="if(event.target===this)closeUnreceiveModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:420px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:15px;font-weight:700;">Un-receive Item</div>
+        <button onclick="closeUnreceiveModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:14px 24px 0;">
+        <div id="unreceive-item-label" style="font-size:13px;color:var(--text);margin-bottom:12px;"></div>
+        <div id="unreceive-warning" style="display:none;background:rgba(247,201,79,0.08);border:1px solid rgba(247,201,79,0.3);border-radius:6px;padding:8px 12px;font-size:11px;color:var(--warn);margin-bottom:12px;"></div>
+        <label class="fl">Qty to un-receive</label>
+        <input class="plain-input" id="unreceive-qty" type="number" min="1" value="1" style="width:100px;">
+        <span id="unreceive-qty-max" style="font-size:11px;color:var(--text-dim);margin-left:8px;"></span>
+      </div>
+      <div style="padding:16px 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeUnreceiveModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="confirmUnreceive()" class="btn" style="background:rgba(247,201,79,0.15);color:var(--warn);border:1px solid rgba(247,201,79,0.4);font-weight:700;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;cursor:pointer;">↩ Reverse Receipt</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Allocate from Stock Modal -->
+  <div id="alloc-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:560px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:15px;font-weight:700;">Allocate from Stock</div>
+          <div id="alloc-modal-item-label" style="font-size:12px;color:var(--text-muted);margin-top:3px;"></div>
+        </div>
+        <button onclick="closeAllocateModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:12px 24px;font-size:12px;color:var(--text-muted)">Select inventory units to allocate to this scope item. Bulk records are allocated in full.</div>
+      <div id="alloc-modal-body" style="padding:0 24px 16px;"></div>
+      <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeAllocateModal()" class="btn btn-ghost">Cancel</button>
+        <button id="alloc-confirm-btn" onclick="confirmAllocate()" style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Allocate Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Remove Scope Item (inventory disposition) Modal -->
+  <div id="rsi-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:560px;max-width:95vw;max-height:85vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:15px;font-weight:700;">Remove Scope Item</div>
+          <div id="rsi-item-label" style="font-size:12px;color:var(--text-muted);margin-top:3px;"></div>
+        </div>
+        <button onclick="closeRemoveScopeModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div id="rsi-count-note" style="padding:12px 24px 0;font-size:12px;color:var(--text-muted)"></div>
+      <div id="rsi-open-po-note" style="padding:8px 24px 0;font-size:12px;color:var(--accent3);display:none;"></div>
+      <div style="padding:14px 24px 0;display:flex;flex-direction:column;gap:8px;">
+        <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px;">
+          <input type="radio" name="rsi-mode" value="unalloc" checked onchange="rsiSetMode('unalloc')"> Return units to Unallocated inventory
+        </label>
+        <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:13px;">
+          <input type="radio" name="rsi-mode" value="transfer" onchange="rsiSetMode('transfer')"> Transfer units to another project
+        </label>
+      </div>
+      <div id="rsi-proj-wrap" style="padding:10px 24px 0;display:none;">
+        <label class="fl">Destination project</label>
+        <select id="rsi-proj" class="plain-select"></select>
+      </div>
+      <div style="padding:12px 24px 0;">
+        <label class="fl">Location (optional — keep current if blank)</label>
+        <select id="rsi-loc" style="display:none"><option value="">— None —</option></select>
+        <div style="display:flex;gap:4px;">
+          <select id="rsi-loc-t1" class="plain-select" style="flex:1;min-width:0;" onchange="_locCascadeT1('rsi-loc')"><option value="">Aisle…</option></select>
+          <select id="rsi-loc-t2" class="plain-select" style="flex:1;min-width:0;" disabled onchange="_locCascadeT2('rsi-loc')"><option value="">Rack…</option></select>
+          <select id="rsi-loc-t3" class="plain-select" style="flex:1;min-width:0;" disabled onchange="_locCascadeT3('rsi-loc')"><option value="">Shelf…</option></select>
+        </div>
+      </div>
+      <div style="padding:12px 24px 0;">
+        <label class="fl">Note (optional)</label>
+        <textarea id="rsi-note" class="plain-select" style="width:100%;min-height:54px;resize:vertical;"></textarea>
+      </div>
+      <div style="padding:18px 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeRemoveScopeModal()" class="btn btn-ghost">Cancel</button>
+        <button id="rsi-confirm-btn" onclick="confirmRemoveScope()" style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Return to Unallocated</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF Import Review Modal -->
+  <div id="pdf-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:210;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:780px;max-width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:15px;font-weight:700;">Review Imported POs</div>
+        <button onclick="closePDFModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:8px 24px 0;font-size:12px;color:var(--text-muted)">Review each PO and its line items. Unmatched items can be added to the Pricebook inline.</div>
+      <div id="pdf-review-body" style="padding:16px 24px;"></div>
+      <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closePDFModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="confirmPDFImport()" class="btn" style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Import All POs</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New PO from Project Modal -->
+  <div id="new-po-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:220;align-items:flex-start;justify-content:center;padding:32px 20px;overflow-y:auto;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:720px;max-width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+
+      <!-- Header -->
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <div style="font-size:15px;font-weight:700;">New Purchase Order</div>
+          <div id="new-po-proj-label" style="font-size:12px;color:var(--text-muted);margin-top:3px;"></div>
+        </div>
+        <button onclick="closeNewPOModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+
+      <!-- PO Header fields -->
+      <div style="padding:16px 24px 0;display:flex;gap:10px;flex-wrap:wrap;">
+        <div class="fg" style="flex:0 0 120px">
+          <label class="fl">PO Number <span style="color:var(--accent4);font-size:8px">*</span></label>
+          <input class="plain-input" id="npo-num" type="text" placeholder="2574" oninput="npoCheckReady()">
+        </div>
+        <div class="fg" style="flex:0 0 180px">
+          <label class="fl">Vendor <span style="color:var(--accent4);font-size:8px">*</span></label>
+          <div class="ac-wrap">
+            <select class="plain-select" id="npo-vendor" style="width:100%;" onchange="vendorSelectChanged(this)"></select>
+          </div>
+        </div>
+        <div class="fg" style="flex:0 0 130px">
+          <label class="fl">Date</label>
+          <input class="plain-input" id="npo-date" type="date">
+        </div>
+        <div class="fg" style="flex:0 0 120px">
+          <label class="fl">Shipment</label>
+          <input class="plain-input" id="npo-ship" type="text" placeholder="Ground" value="Ground">
+        </div>
+        <div class="fg" style="flex:0 0 100px">
+          <label class="fl">Status</label>
+          <select class="plain-select" id="npo-status">
+            <option>Draft</option><option selected>Submitted</option><option>Backorder</option><option>Received</option>
+          </select>
+        </div>
+        <div class="fg" style="flex:1;min-width:120px">
+          <label class="fl">Notes</label>
+          <input class="plain-input" id="npo-notes" type="text" placeholder="Optional">
+        </div>
+      </div>
+      <div style="padding:8px 24px 0;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div class="fg" style="flex:0 0 180px">
+          <label class="fl">Ship-To Location</label>
+          <select class="plain-select" id="npo-ship-addr-sel" onchange="npoOnAddrSelect('npo-ship-addr-sel','npo-ship-addr')" style="font-size:11px;">
+            <option value="">— select location —</option>
+          </select>
+        </div>
+        <div class="fg" style="flex:1;min-width:200px">
+          <label class="fl">Delivery Address</label>
+          <textarea class="plain-input" id="npo-ship-addr" rows="4" placeholder="Street, City, State ZIP" style="resize:vertical;font-family:var(--font-mono);font-size:12px;line-height:1.5;"></textarea>
+        </div>
+      </div>
+
+      <!-- Line items list -->
+      <div style="padding:16px 24px 0;">
+        <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px;">Line Items</div>
+        <!-- Project scope picker (shown when opened from a project that has scope items) -->
+        <div id="npo-scope-picker" style="display:none;margin-bottom:12px;border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+          <div style="padding:8px 14px;background:var(--surface3);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+            <span>Project Scope</span>
+            <span style="text-transform:none;letter-spacing:0;color:var(--accent);font-size:11px;">✓ Check items to include → set qty &amp; price → click Create PO</span>
+          </div>
+          <div id="npo-scope-list"></div>
+        </div>
+        <div id="npo-items-list" style="border:1px solid var(--border);border-radius:6px;overflow:hidden;"></div>
+      </div>
+
+      <!-- Add item — toggle between Pricebook and Manual -->
+      <div style="padding:14px 24px 0;">
+        <div style="display:flex;gap:0;margin-bottom:10px;">
+          <button id="npo-mode-pb" onclick="setNPOMode('pb')"
+            style="padding:6px 14px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:6px 0 0 6px;cursor:pointer;">Pricebook</button>
+          <button id="npo-mode-manual" onclick="setNPOMode('manual')"
+            style="padding:6px 14px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text-muted);border:1px solid var(--border);border-left:none;border-radius:0 6px 6px 0;cursor:pointer;">Manual</button>
+        </div>
+
+        <!-- Pricebook add row -->
+        <div id="npo-pb-row" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;">
+          <div class="fg" style="flex:0 0 170px">
+            <label class="fl">Manufacturer</label>
+            <div class="ac-wrap">
+              <input class="ac-input" id="npo-mfg" type="text" placeholder="Type to search…"
+                     autocomplete="off" oninput="acFilter('npo','mfg')" onfocus="acOpen('npo','mfg')" onkeydown="acKey(event,'npo','mfg')">
+              <div class="ac-dropdown" id="dd-npo-mfg"></div>
+            </div>
+          </div>
+          <div class="fg" style="flex:0 0 220px">
+            <label class="fl">Model</label>
+            <div class="ac-wrap">
+              <input class="ac-input" id="npo-model" type="text" placeholder="Select manufacturer first…"
+                     autocomplete="off" oninput="acFilter('npo','model')" onfocus="acOpen('npo','model')" onkeydown="acKey(event,'npo','model')" disabled>
+              <div class="ac-dropdown" id="dd-npo-model"></div>
+            </div>
+          </div>
+          <div class="fg" style="flex:0 0 120px">
+            <label class="fl">SKU <span style="color:var(--text-dim);font-size:8px;letter-spacing:0">(auto)</span></label>
+            <input class="plain-input" id="npo-sku" type="text" placeholder="—" readonly
+                   style="color:var(--accent);font-family:var(--font-mono);font-size:11px;background:var(--surface3)">
+          </div>
+          <div class="fg" style="flex:0 0 58px"><label class="fl">Qty</label><input class="plain-input" id="npo-qty" type="number" min="1" value="1"></div>
+          <div class="fg" style="flex:0 0 100px"><label class="fl">Unit Price ($)</label><input class="plain-input" id="npo-price" type="number" min="0" step="0.01" placeholder="0.00"></div>
+          <button class="btn-add" id="npo-add-pb" onclick="addNPOPricebookItem()" disabled style="padding:8px 14px;">Add</button>
+        </div>
+
+        <!-- Manual add row -->
+        <div id="npo-manual-row" style="display:none;display:none;flex-wrap:wrap;gap:9px;align-items:flex-end;">
+          <div class="fg" style="flex:1;min-width:200px"><label class="fl">Description <span style="color:var(--accent4);font-size:8px">*</span></label><input class="plain-input" id="npo-manual-desc" type="text" placeholder="e.g. Shipping, Tariff, Labor"></div>
+          <div class="fg" style="flex:0 0 58px"><label class="fl">Qty</label><input class="plain-input" id="npo-manual-qty" type="number" min="1" value="1"></div>
+          <div class="fg" style="flex:0 0 110px"><label class="fl">Unit Price ($)</label><input class="plain-input" id="npo-manual-price" type="number" min="0" step="0.01" placeholder="0.00"></div>
+          <button class="btn-add" onclick="addNPOManualItem()" style="padding:8px 14px;">Add</button>
+        </div>
+      </div>
+
+      <!-- Running total + additional costs -->
+      <div style="padding:14px 24px;">
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:11px;color:var(--text-muted);width:58px;flex-shrink:0;">Tax</span>
+            <button type="button" id="npo-tax-mode" onclick="npoToggleMode('tax')" title="Toggle $ / %" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+            <input id="npo-tax-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="npoUpdateTotal()">
+            <span id="npo-tax-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:11px;color:var(--text-muted);width:58px;flex-shrink:0;">Tariff</span>
+            <button type="button" id="npo-tariff-mode" onclick="npoToggleMode('tariff')" title="Toggle $ / %" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+            <input id="npo-tariff-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="npoUpdateTotal()">
+            <span id="npo-tariff-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:11px;color:var(--text-muted);width:58px;flex-shrink:0;">Shipping</span>
+            <button type="button" id="npo-shipping-mode" onclick="npoToggleMode('shipping')" title="Toggle $ / %" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+            <input id="npo-shipping-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="npoUpdateTotal()">
+            <span id="npo-shipping-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:11px;color:var(--accent4);width:58px;flex-shrink:0;">Discount</span>
+            <button type="button" id="npo-discount-mode" onclick="npoToggleMode('discount')" title="Toggle $ / %" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--accent4);cursor:pointer;">$</button>
+            <input id="npo-discount-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="npoUpdateTotal()">
+            <span id="npo-discount-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent4);min-width:90px;"></span>
+          </div>
+          <div id="npo-other-charges"></div>
+          <button type="button" onclick="npoAddOC()" style="align-self:flex-start;padding:3px 10px;font-size:11px;border-radius:4px;background:none;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;">+ Add charge</button>
+        </div>
+        <div style="display:flex;justify-content:flex-end;align-items:baseline;gap:20px;border-top:1px solid var(--border);padding-top:10px;">
+          <div style="font-size:12px;color:var(--text-muted);">Subtotal: <span id="npo-subtotal" style="font-family:var(--font-mono);">$0.00</span></div>
+          <div style="text-align:right;"><div style="font-size:10px;color:var(--text-dim);">Grand Total</div><div id="npo-total" style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--accent3)">$0.00</div></div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:16px;">
+        <button onclick="closeNewPOModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="confirmNewPO(true)" id="npo-another-btn" class="btn btn-ghost" disabled style="color:var(--accent);border-color:rgba(79,142,247,0.3);">Save + Another</button>
+        <button onclick="confirmNewPO(false)" id="npo-confirm-btn" class="btn" disabled
+          style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Create PO</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit PO Modal -->
+  <div id="edit-po-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:540px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:15px;font-weight:700;">Edit Purchase Order</div>
+        <button onclick="closeEditPOModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:18px 24px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="fg" style="grid-column:1/-1">
+          <label class="fl">Vendor <span style="color:var(--accent4);font-size:8px">*</span></label>
+          <div class="ac-wrap">
+            <select class="plain-select" id="edit-po-vendor" style="width:100%;" onchange="vendorSelectChanged(this)"></select>
+          </div>
+        </div>
+        <div class="fg"><label class="fl">Status</label>
+          <select class="plain-select" id="edit-po-status">
+            <option>Draft</option><option>Submitted</option><option>Backorder</option><option>Received</option><option>Cancelled</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Date</label>
+          <input class="plain-input" id="edit-po-date" type="date">
+        </div>
+        <div class="fg"><label class="fl">Shipment</label>
+          <input class="plain-input" id="edit-po-ship" type="text" placeholder="Ground">
+        </div>
+        <div class="fg"><label class="fl">Project</label>
+          <div class="ac-wrap">
+            <input class="ac-input" id="edit-po-project" type="text" placeholder="Optional"
+                   autocomplete="off" oninput="acFilter('editpo','project')" onfocus="acOpen('editpo','project')" onkeydown="acKey(event,'editpo','project')">
+            <div class="ac-dropdown" id="dd-editpo-project"></div>
+          </div>
+        </div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Notes</label>
+          <input class="plain-input" id="edit-po-notes" type="text" placeholder="Optional">
+        </div>
+        <div class="fg" style="grid-column:1/-1">
+          <label class="fl">Ship-To Location</label>
+          <select class="plain-select" id="epo-ship-addr-sel" onchange="npoOnAddrSelect('epo-ship-addr-sel','epo-ship-addr')" style="font-size:11px;margin-bottom:6px;">
+            <option value="">— select location —</option>
+          </select>
+          <textarea class="plain-input" id="epo-ship-addr" rows="4" placeholder="Delivery address" style="resize:vertical;font-family:var(--font-mono);font-size:12px;line-height:1.5;"></textarea>
+        </div>
+      </div>
+      <!-- Scope picker (shown when PO has a project with remaining scope items) -->
+      <div id="epo-scope-picker" style="display:none;padding:0 24px 12px;">
+        <div style="border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+          <div style="padding:8px 14px;background:var(--surface3);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+            <span>Add From Project Scope</span>
+            <span style="text-transform:none;letter-spacing:0;color:var(--accent);font-size:11px;">✓ Check items to add to this PO</span>
+          </div>
+          <div id="epo-scope-list"></div>
+        </div>
+      </div>
+      <!-- Additional costs section -->
+      <div style="padding:0 24px 16px;">
+        <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;border-top:1px solid var(--border);padding-top:14px;">Additional Costs</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;color:var(--text-muted);width:60px;flex-shrink:0;">Tax</span>
+            <button type="button" id="epo-tax-mode" onclick="epoToggleMode('tax')" title="Toggle $ / %" style="padding:3px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+            <input id="epo-tax-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:110px;" oninput="epoUpdateCalc('tax')">
+            <span id="epo-tax-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;color:var(--text-muted);width:60px;flex-shrink:0;">Tariff</span>
+            <button type="button" id="epo-tariff-mode" onclick="epoToggleMode('tariff')" title="Toggle $ / %" style="padding:3px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+            <input id="epo-tariff-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:110px;" oninput="epoUpdateCalc('tariff')">
+            <span id="epo-tariff-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;color:var(--text-muted);width:60px;flex-shrink:0;">Shipping</span>
+            <button type="button" id="epo-shipping-mode" onclick="epoToggleMode('shipping')" title="Toggle $ / %" style="padding:3px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+            <input id="epo-shipping-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:110px;" oninput="epoUpdateCalc('shipping')">
+            <span id="epo-shipping-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:12px;color:var(--accent4);width:60px;flex-shrink:0;">Discount</span>
+            <button type="button" id="epo-discount-mode" onclick="epoToggleMode('discount')" title="Toggle $ / %" style="padding:3px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--accent4);cursor:pointer;">$</button>
+            <input id="epo-discount-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:110px;" oninput="epoUpdateCalc('discount')">
+            <span id="epo-discount-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent4);min-width:90px;"></span>
+          </div>
+          <div id="epo-other-charges"></div>
+          <button type="button" onclick="epoAddOC()" style="align-self:flex-start;padding:3px 10px;font-size:11px;border-radius:4px;background:none;border:1px solid var(--border);color:var(--text-muted);cursor:pointer;">+ Add charge</button>
+          <div style="display:flex;justify-content:flex-end;gap:20px;align-items:baseline;padding-top:10px;border-top:1px solid var(--border);">
+            <span style="font-size:12px;color:var(--text-muted);">Subtotal: <span id="epo-subtotal-disp" style="font-family:var(--font-mono);">$0.00</span></span>
+            <span style="font-size:13px;font-weight:700;color:var(--accent3);">Grand Total: <span id="epo-grand" style="font-family:var(--font-mono);">$0.00</span></span>
+          </div>
+        </div>
+      </div>
+      <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeEditPOModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="saveEditPO()" class="btn" style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit PO Item Modal -->
+  <div id="edit-poi-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:210;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:500px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:15px;font-weight:700;">Edit Line Item</div>
+        <button onclick="closeEditPOItemModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:18px 24px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Manufacturer</label>
+          <div class="ac-wrap">
+            <input class="ac-input" id="edit-poi-mfg" type="text" placeholder="Type to search…"
+                   autocomplete="off" oninput="acFilter('editpoi','mfg')" onfocus="acOpen('editpoi','mfg')" onkeydown="acKey(event,'editpoi','mfg')">
+            <div class="ac-dropdown" id="dd-editpoi-mfg"></div>
+          </div>
+        </div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Model</label>
+          <div class="ac-wrap">
+            <input class="ac-input" id="edit-poi-model" type="text" placeholder="Select manufacturer first…"
+                   autocomplete="off" oninput="acFilter('editpoi','model')" onfocus="acOpen('editpoi','model')" onkeydown="acKey(event,'editpoi','model')" disabled>
+            <div class="ac-dropdown" id="dd-editpoi-model"></div>
+          </div>
+        </div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">SKU</label>
+          <input class="plain-input" id="edit-poi-sku" type="text" readonly
+                 style="color:var(--accent);font-family:var(--font-mono);font-size:11px;background:var(--surface3)">
+        </div>
+        <div class="fg"><label class="fl">Qty Ordered</label>
+          <input class="plain-input" id="edit-poi-qty" type="number" min="1">
+        </div>
+        <div class="fg"><label class="fl">Unit Price ($)</label>
+          <input class="plain-input" id="edit-poi-price" type="number" min="0" step="0.01">
+        </div>
+        <div class="fg"><label class="fl">Discount ($)</label>
+          <input class="plain-input" id="edit-poi-discount" type="number" min="0" step="0.01">
+        </div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Description / Notes</label>
+          <input class="plain-input" id="edit-poi-notes" type="text" placeholder="Optional">
+        </div>
+      </div>
+      <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeEditPOItemModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="saveEditPOItem()" class="btn" style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RMA PAGE ══ -->
+  <div class="page" id="page-rma">
+    <div id="rma-content" style="flex:1;flex-direction:column;overflow:hidden;display:flex;">
+
+      <!-- RMA list view -->
+      <div id="rma-list-view" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="page-toolbar">
+          <div class="stat-chip" id="rma-chip-total">0 <span>RMAs</span></div>
+          <div class="stat-chip" id="rma-chip-open">0 <span>open</span></div>
+          <div class="stat-chip" id="rma-chip-shipped">0 <span>shipped</span></div>
+          <div class="stat-chip" id="rma-chip-received">0 <span>received</span></div>
+          <div class="search-wrap">
+            <span style="color:var(--text-dim);font-size:12px">⌕</span>
+            <input type="text" placeholder="Search RMAs…" oninput="filterRMAs(this.value)">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th class="sortable" onclick="setSort('rma','rmaId')">RMA ID</th>
+              <th class="sortable" onclick="setSort('rma','type')">Type</th>
+              <th class="sortable mobile-hide" onclick="setSort('rma','projectName')">Project</th>
+              <th class="sortable mobile-hide" onclick="setSort('rma','sku')">SKU</th>
+              <th class="sortable" onclick="setSort('rma','manufacturer')">Manufacturer</th>
+              <th class="sortable" onclick="setSort('rma','model')">Model</th>
+              <th class="sortable" style="width:50px" onclick="setSort('rma','qty')">Qty</th>
+              <th class="sortable mobile-hide" onclick="setSort('rma','vendor')">Vendor</th>
+              <th class="sortable" style="width:100px" onclick="setSort('rma','status')">Status</th>
+              <th class="sortable mobile-hide" onclick="setSort('rma','trackingNumber')">Tracking</th>
+              <th class="sortable mobile-hide" onclick="setSort('rma','dateOpened')">Opened</th>
+              <th style="width:36px"></th>
+            </tr></thead>
+            <tbody id="rma-tbody"></tbody>
+          </table>
+        </div>
+        <!-- Add RMA form -->
+        <div class="add-bar">
+          <div class="form-row">
+            <div class="fg" style="flex:0 0 100px">
+              <label class="fl">RMA ID <span style="color:var(--text-dim);font-size:8px">(auto)</span></label>
+              <input class="plain-input" id="rma-id" type="text" placeholder="—" readonly
+                     style="color:var(--accent);font-family:var(--font-mono);font-size:11px;background:var(--surface3)">
+            </div>
+            <div class="fg" style="flex:0 0 110px">
+              <label class="fl">Vendor RMA #</label>
+              <input class="plain-input" id="rma-vendor-rma" type="text" placeholder="Theirs…"
+                     style="font-family:var(--font-mono);font-size:11px">
+            </div>
+            <div class="fg" style="flex:0 0 150px">
+              <label class="fl">Type <span style="color:var(--accent4);font-size:8px">*</span></label>
+              <select class="plain-select" id="rma-type" onchange="rmaCheckReady()">
+                <option value="">Select type…</option>
+                <option>Return to Vendor</option>
+                <option>Customer Return</option>
+                <option>Repair/Service</option>
+                <option>Exchange/Replacement</option>
+              </select>
+            </div>
+            <div class="fg" style="flex:0 0 180px">
+              <label class="fl">Manufacturer <span style="color:var(--accent4);font-size:8px">*</span></label>
+              <div class="ac-wrap">
+                <input class="ac-input" id="rma-mfg" type="text" placeholder="Type to search…"
+                       autocomplete="off" oninput="acFilter('rma','mfg')" onfocus="acOpen('rma','mfg')" onkeydown="acKey(event,'rma','mfg')">
+                <div class="ac-dropdown" id="dd-rma-mfg"></div>
+              </div>
+            </div>
+            <div class="fg" style="flex:0 0 220px">
+              <label class="fl">Model <span style="color:var(--accent4);font-size:8px">*</span></label>
+              <div class="ac-wrap">
+                <input class="ac-input" id="rma-model" type="text" placeholder="Select manufacturer first…"
+                       autocomplete="off" oninput="acFilter('rma','model')" onfocus="acOpen('rma','model')" onkeydown="acKey(event,'rma','model')" disabled>
+                <div class="ac-dropdown" id="dd-rma-model"></div>
+              </div>
+            </div>
+            <div class="fg" style="flex:0 0 120px">
+              <label class="fl">SKU <span style="color:var(--text-dim);font-size:8px">(auto)</span></label>
+              <input class="plain-input" id="rma-sku" type="text" placeholder="—" readonly
+                     style="color:var(--accent);font-family:var(--font-mono);font-size:11px;background:var(--surface3)">
+            </div>
+            <div class="fg" style="flex:0 0 60px">
+              <label class="fl">Qty</label>
+              <input class="plain-input" id="rma-qty" type="number" min="1" value="1">
+            </div>
+            <div class="fg" style="flex:0 0 150px">
+              <label class="fl">Project</label>
+              <div class="ac-wrap">
+                <input class="ac-input" id="rma-project" type="text" placeholder="Optional…"
+                       autocomplete="off" oninput="acFilter('rma','project')" onfocus="acOpen('rma','project')" onkeydown="acKey(event,'rma','project')">
+                <div class="ac-dropdown" id="dd-rma-project"></div>
+              </div>
+            </div>
+            <div class="fg" style="flex:0 0 130px">
+              <label class="fl">Vendor</label>
+              <div class="ac-wrap">
+                <input class="ac-input" id="rma-vendor" type="text" placeholder="Optional…"
+                       autocomplete="off" oninput="acVendor('rma-vendor')" onfocus="acVendor('rma-vendor')" onkeydown="acVendorKey(event,'rma-vendor')">
+                <div class="ac-dropdown" id="dd-rma-vendor"></div>
+              </div>
+            </div>
+            <div class="fg" style="flex:0 0 100px">
+              <label class="fl">Status</label>
+              <select class="plain-select" id="rma-status">
+                <option>Open</option><option>Shipped</option><option>Received</option><option>Closed</option><option>Denied</option>
+              </select>
+            </div>
+            <div class="fg" style="flex:0 0 120px">
+              <label class="fl">Date Opened</label>
+              <input class="plain-input" id="rma-date" type="date">
+            </div>
+            <div class="fg" style="flex:0 0 110px">
+              <label class="fl">Carrier</label>
+              <select class="plain-select" id="rma-carrier" onchange="rmaBillingHint()">
+                <option value="">—</option>
+                <option>UPS</option><option>FedEx</option><option>USPS</option><option>DHL</option><option>Freight</option><option>Other</option>
+              </select>
+            </div>
+            <div class="fg" style="flex:0 0 150px">
+              <label class="fl">Billing</label>
+              <select class="plain-select" id="rma-billing-type" onchange="rmaBillingHint()">
+                <option value="">—</option>
+                <option>Bill Receiver (vendor acct)</option>
+                <option>Third Party (vendor acct)</option>
+                <option>Prepaid (we pay)</option>
+                <option>Collect</option>
+                <option>Vendor label provided</option>
+              </select>
+            </div>
+            <div class="fg" style="flex:0 0 130px">
+              <label class="fl">Billing Acct #</label>
+              <input class="plain-input" id="rma-billing-account" type="text" placeholder="—"
+                     style="font-family:var(--font-mono);font-size:11px;text-transform:uppercase">
+            </div>
+            <div class="fg" style="flex:0 0 170px">
+              <label class="fl">Tracking #</label>
+              <input class="plain-input" id="rma-tracking" type="text" placeholder="Optional…"
+                     style="font-family:var(--font-mono);font-size:11px">
+            </div>
+            <div class="fg" style="flex:0 0 240px">
+              <label class="fl">Ship To (return address)</label>
+              <input class="plain-input" id="rma-ship-to" type="text" placeholder="Street, City, ST ZIP">
+            </div>
+            <div class="fg" style="flex:1;min-width:100px">
+              <label class="fl">Reason / Notes <span style="color:var(--accent4);font-size:8px">*</span></label>
+              <input class="plain-input" id="rma-reason" type="text" placeholder="Describe the issue…" oninput="rmaCheckReady()">
+            </div>
+            <button class="btn-add" id="rma-btn-add" onclick="addRMA()" disabled>Create RMA</button>
+            <div id="rma-ship-hint" style="flex:1 0 100%;font-size:11px;color:var(--text-dim);line-height:1.4;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RMA detail view -->
+      <div id="rma-detail-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+        <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;">
+          <button class="btn btn-ghost" onclick="showRMAList()" style="padding:6px 12px;font-size:12px;">← Back</button>
+          <div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span id="rma-det-id" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent)"></span>
+              <span id="rma-det-type-badge"></span>
+              <span id="rma-det-status-badge"></span>
+            </div>
+            <div id="rma-det-meta" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px;">
+            <button class="btn btn-ghost" onclick="editRMA(currentRMAId)" style="padding:6px 12px;font-size:12px;">✎ Edit</button>
+            <button class="btn" onclick="deleteRMA(currentRMAId)"
+              style="padding:6px 12px;font-size:12px;background:rgba(247,79,126,0.1);color:var(--accent4);border:1px solid rgba(247,79,126,0.25);">✕ Delete</button>
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:24px;">
+          <div id="rma-det-body" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:20px;max-width:900px;"></div>
+          <div style="margin-top:24px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;max-width:900px;">
+            <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px;">Reason / Notes</div>
+            <div id="rma-det-reason" style="font-size:13px;color:var(--text);line-height:1.6;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit RMA Modal -->
+  <div id="rma-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+    <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:580px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+      <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:15px;font-weight:700;">Edit RMA</div>
+        <button onclick="closeRMAModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:18px 24px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="fg"><label class="fl">Type</label>
+          <select class="plain-select" id="edit-rma-type">
+            <option>Return to Vendor</option><option>Customer Return</option><option>Repair/Service</option><option>Exchange/Replacement</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Status</label>
+          <select class="plain-select" id="edit-rma-status">
+            <option>Open</option><option>Shipped</option><option>Received</option><option>Closed</option><option>Denied</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Vendor</label><input class="plain-input" id="edit-rma-vendor" type="text"></div>
+        <div class="fg"><label class="fl">Vendor RMA #</label><input class="plain-input" id="edit-rma-vendor-rma" type="text" style="font-family:var(--font-mono)"></div>
+        <div class="fg"><label class="fl">Qty</label><input class="plain-input" id="edit-rma-qty" type="number" min="1"></div>
+        <div class="fg"><label class="fl">Date Opened</label><input class="plain-input" id="edit-rma-date" type="date"></div>
+        <div class="fg"><label class="fl">Date Closed</label><input class="plain-input" id="edit-rma-date-closed" type="date"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Reason / Notes</label><input class="plain-input" id="edit-rma-reason" type="text"></div>
+        <div style="grid-column:1/-1;border-top:1px solid var(--border);margin-top:4px;padding-top:12px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);">Return Shipping</div>
+        <div class="fg"><label class="fl">Carrier</label>
+          <select class="plain-select" id="edit-rma-carrier" onchange="rmaEditBillingHint()">
+            <option value="">—</option>
+            <option>UPS</option><option>FedEx</option><option>USPS</option><option>DHL</option><option>Freight</option><option>Other</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Billing</label>
+          <select class="plain-select" id="edit-rma-billing-type" onchange="rmaEditBillingHint()">
+            <option value="">—</option>
+            <option>Bill Receiver (vendor acct)</option>
+            <option>Third Party (vendor acct)</option>
+            <option>Prepaid (we pay)</option>
+            <option>Collect</option>
+            <option>Vendor label provided</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Billing Acct #</label>
+          <input class="plain-input" id="edit-rma-billing-account" type="text" style="font-family:var(--font-mono);text-transform:uppercase"></div>
+        <div class="fg"><label class="fl">Date Shipped</label><input class="plain-input" id="edit-rma-date-shipped" type="date"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Tracking #</label>
+          <input class="plain-input" id="edit-rma-tracking" type="text" style="font-family:var(--font-mono)"></div>
+        <div class="fg" style="grid-column:1/-1"><label class="fl">Ship To (return address)</label>
+          <textarea class="plain-input" id="edit-rma-ship-to" rows="3" placeholder="Company&#10;Street&#10;City, ST ZIP"
+            style="resize:vertical;line-height:1.4;font-family:var(--font-ui);"></textarea></div>
+        <div id="edit-rma-ship-hint" style="grid-column:1/-1;font-size:11px;color:var(--text-dim);line-height:1.4;"></div>
+      </div>
+      <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+        <button onclick="closeRMAModal()" class="btn btn-ghost">Cancel</button>
+        <button onclick="saveEditRMA()" class="btn" style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SHOP STOCK PAGE ══ -->
+  <div class="page" id="page-stock">
+    <div id="stock-content" style="flex:1;flex-direction:column;overflow:hidden;display:flex;">
+      <div class="page-toolbar">
+        <div class="stat-chip" id="stock-chip-total">0 <span>items</span></div>
+        <div class="stat-chip" id="stock-chip-ok">0 <span>at par</span></div>
+        <div class="stat-chip" id="stock-chip-low">0 <span>low</span></div>
+        <div class="stat-chip" id="stock-chip-out">0 <span>out</span></div>
+        <div class="search-wrap">
+          <span style="color:var(--text-dim);font-size:12px">⌕</span>
+          <input type="text" placeholder="Search stock…" oninput="filterStock(this.value)">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" onclick="setSort('stock','manufacturer')">Manufacturer</th>
+            <th class="sortable" onclick="setSort('stock','model')">Model</th>
+            <th class="sortable mobile-hide" onclick="setSort('stock','category')">Category</th>
+            <th class="sortable" style="width:90px" onclick="setSort('stock','qty')">Qty on Hand</th>
+            <th class="sortable" style="width:60px" onclick="setSort('stock','par')">Par</th>
+            <th class="sortable" style="width:110px" onclick="setSort('stock','needToOrder')">Need to Order</th>
+            <th class="sortable" style="width:100px" onclick="setSort('stock','status')">Status</th>
+            <th class="sortable mobile-hide" onclick="setSort('stock','onOrder')">On Order</th>
+            <th class="sortable mobile-hide" onclick="setSort('stock','notes')">Notes</th>
+            <th class="sortable mobile-hide" style="width:140px" onclick="setSort('stock','lastReceived')">Last Received</th>
+          </tr></thead>
+          <tbody id="stock-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ LOCATIONS PAGE ══ -->
+  <div class="page" id="page-loc">
+    <div id="loc-content" style="flex:1;flex-direction:column;overflow:hidden;display:flex;">
+      <!-- Toolbar -->
+      <div class="page-toolbar">
+        <div class="stat-chip" id="loc-chip-warehouses">0 <span>warehouses</span></div>
+        <div class="stat-chip" id="loc-chip-locations">0 <span>locations</span></div>
+        <div class="stat-chip" id="loc-chip-staging" style="color:var(--accent3);">0 <span>staging</span></div>
+        <button class="btn" id="loc-btn-setup" onclick="locShowSetup()"
+          style="background:rgba(79,142,247,0.12);color:var(--accent);border:1px solid rgba(79,142,247,0.35);font-size:12px;height:32px;">
+          ＋ Auto Setup New Warehouse
+        </button>
+        <button class="btn btn-ghost" id="loc-btn-add-manual" onclick="locShowAddManual()"
+          style="font-size:12px;height:32px;">
+          ＋ Add Manually
+        </button>
+      </div>
+      <!-- Body: dynamically rendered sub-views -->
+      <div id="loc-body" style="flex:1;overflow-y:auto;padding:24px 28px;"></div>
+    </div>
+  </div>
+
+  <!-- ══ FRONT DESK PAGE ══ -->
+  <div class="page" id="page-fd">
+    <!-- Main view: dashboard + sub-tabs + lists -->
+    <div id="fd-main-view" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+      <!-- Dashboard strip -->
+      <div class="page-toolbar" style="flex-shrink:0;gap:20px;padding:10px 24px;">
+        <div class="stat-chip" id="fd-ar-chip" style="cursor:default;">$0.00 <span>AR Outstanding</span></div>
+        <div class="stat-chip" id="fd-ov-inv-chip" style="cursor:default;">0 <span>Overdue Invoices</span></div>
+        <div style="width:1px;background:var(--border);height:20px;"></div>
+        <div class="stat-chip" id="fd-ap-chip" style="cursor:default;">$0.00 <span>AP Outstanding</span></div>
+        <div class="stat-chip" id="fd-ov-bill-chip" style="cursor:default;">0 <span>Overdue Bills</span></div>
+      </div>
+      <!-- Sub-tab bar -->
+      <div style="display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 24px;flex-shrink:0;">
+        <div id="fdtab-clients" onclick="setFDTab('clients')"
+          style="padding:10px 18px;font-size:12px;font-weight:600;color:var(--accent);border-bottom:2px solid var(--accent);cursor:pointer;margin-bottom:-1px;">Clients</div>
+        <div id="fdtab-inv" onclick="setFDTab('inv')"
+          style="padding:10px 18px;font-size:12px;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-1px;">Invoices</div>
+        <div id="fdtab-bills" onclick="setFDTab('bills')"
+          style="padding:10px 18px;font-size:12px;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-1px;">Vendor Bills</div>
+        <div id="fdtab-vendors" onclick="setFDTab('vendors')"
+          style="padding:10px 18px;font-size:12px;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-1px;">Vendors</div>
+      </div>
+      <!-- Invoices view -->
+      <div id="fd-inv-view" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+        <div class="page-toolbar">
+          <div class="stat-chip" id="fd-inv-total-chip">$0.00 <span>invoiced</span></div>
+          <div class="stat-chip" id="fd-inv-collected-chip">$0.00 <span>collected</span></div>
+          <div class="stat-chip" id="fd-inv-outstanding-chip">$0.00 <span>outstanding</span></div>
+          <select id="fd-inv-status-filter" class="inv-status-f-sel" onchange="fdInvStatusFilter=this.value;renderFDInvTable()">
+            <option value="">All Statuses</option>
+            <option>Draft</option><option>Sent</option><option>Partial</option><option>Paid</option><option>Overdue</option>
+          </select>
+          <div class="search-wrap" style="margin-left:auto;">
+            <span style="color:var(--text-dim);font-size:12px">⌕</span>
+            <input type="text" placeholder="Search invoices…" oninput="fdInvFilterQuery=this.value;renderFDInvTable()">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Invoice #</th>
+              <th>Client / Project</th>
+              <th>Date</th>
+              <th>Due Date</th>
+              <th>Status</th>
+              <th style="text-align:right">Total</th>
+              <th style="text-align:right">Balance</th>
+              <th style="width:70px"></th>
+            </tr></thead>
+            <tbody id="fd-inv-tbody"></tbody>
+          </table>
+        </div>
+        <div class="add-bar">
+          <div class="form-row" style="justify-content:flex-start;padding:12px 24px;">
+            <button class="btn" onclick="openNewInvoiceModal()" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.35);">＋ New Invoice</button>
+          </div>
+        </div>
+      </div>
+      <!-- Vendor Bills view -->
+      <div id="fd-bills-view" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+        <div class="page-toolbar">
+          <div class="stat-chip" id="fd-bill-total-chip">$0.00 <span>billed</span></div>
+          <div class="stat-chip" id="fd-bill-paid-chip">$0.00 <span>paid</span></div>
+          <div class="stat-chip" id="fd-bill-owed-chip">$0.00 <span>outstanding</span></div>
+          <select id="fd-bill-status-filter" class="inv-status-f-sel" onchange="fdBillStatusFilter=this.value;renderFDBillTable()">
+            <option value="">All Statuses</option>
+            <option>Draft</option><option>Received</option><option>Partial</option><option>Paid</option><option>Overdue</option>
+          </select>
+          <div class="search-wrap" style="margin-left:auto;">
+            <span style="color:var(--text-dim);font-size:12px">⌕</span>
+            <input type="text" placeholder="Search bills…" oninput="fdBillFilterQuery=this.value;renderFDBillTable()">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Bill #</th>
+              <th>Vendor</th>
+              <th>Linked PO</th>
+              <th>Date</th>
+              <th>Due Date</th>
+              <th>Status</th>
+              <th style="text-align:right">Total</th>
+              <th style="text-align:right">Balance</th>
+              <th style="width:70px"></th>
+            </tr></thead>
+            <tbody id="fd-bill-tbody"></tbody>
+          </table>
+        </div>
+        <div class="add-bar">
+          <div class="form-row" style="justify-content:flex-start;padding:12px 24px;gap:10px;">
+            <button class="btn" onclick="openNewBillFromPO()" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.35);">＋ From PO</button>
+            <button class="btn btn-ghost" onclick="openNewBillManual()">＋ Manual Bill</button>
+          </div>
+        </div>
+      </div>
+      <!-- Vendors view -->
+      <div id="fd-vendors-view" style="flex:1;display:none;flex-direction:column;overflow:hidden;">
+        <div class="page-toolbar">
+          <div class="stat-chip" id="fd-vendors-total-chip">0 <span>vendors</span></div>
+          <div class="search-wrap" style="margin-left:auto;">
+            <span style="color:var(--text-dim);font-size:12px">⌕</span>
+            <input type="text" placeholder="Search vendors…" oninput="fdVendorFilterQuery=this.value;renderFDVendors()">
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Vendor</th>
+              <th class="mobile-hide">Contact</th>
+              <th class="mobile-hide">Email</th>
+              <th class="mobile-hide">Phone</th>
+              <th style="text-align:center;width:56px">POs</th>
+              <th style="text-align:center;width:56px">Bills</th>
+              <th style="width:150px"></th>
+            </tr></thead>
+            <tbody id="fd-vendors-tbody"></tbody>
+          </table>
+        </div>
+        <div class="add-bar">
+          <div class="form-row" style="justify-content:flex-start;padding:12px 24px;">
+            <button class="btn" onclick="openVendorModal()" style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.35);">＋ New Vendor</button>
+          </div>
+        </div>
+      </div>
+      <!-- Clients view -->
+      <div id="fd-clients-view" style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+        <div class="page-toolbar">
+          <div style="display:flex;gap:2px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:2px;">
+            <button id="fdf-scope" onclick="setFDFilter('scope')" style="border:none;background:var(--accent);color:#fff;font-family:var(--font-ui);font-size:11px;font-weight:600;padding:4px 12px;border-radius:4px;cursor:pointer;">With Scope</button>
+            <button id="fdf-all" onclick="setFDFilter('all')" style="border:none;background:transparent;color:var(--text-muted);font-family:var(--font-ui);font-size:11px;font-weight:600;padding:4px 12px;border-radius:4px;cursor:pointer;">All</button>
+          </div>
+          <div class="stat-chip" id="fd-clients-total-chip">0 <span>clients</span></div>
+          <button class="btn btn-ghost" onclick="fdTreeCollapseAll()" style="font-size:12px;">Collapse All</button>
+          <button class="btn btn-ghost" onclick="fdTreeExpandAll()" style="font-size:12px;">Expand All</button>
+          <div class="search-wrap" style="margin-left:auto;">
+            <span style="color:var(--text-dim);font-size:12px">⌕</span>
+            <input type="text" placeholder="Search clients, locations, projects…" oninput="fdClientsFilterQuery=this.value;renderFDClientsTable()">
+          </div>
+        </div>
+        <div id="fd-clients-setup-row" style="display:none;padding:14px 24px 0;">
+          <button class="btn" onclick="setupDefaultClient()"
+            style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.35);font-size:12px;">
+            Setup Default Client
+          </button>
+        </div>
+        <div class="table-wrap" style="padding:10px 16px;">
+          <div id="fd-clients-tree"></div>
+        </div>
+        <div class="add-bar">
+          <div class="form-row" style="justify-content:flex-start;padding:12px 24px;">
+            <button class="btn" onclick="openNewClientModal()"
+              style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.35);">＋ New Client</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Client detail view -->
+    <div id="fd-client-detail-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+      <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;flex-wrap:wrap;">
+        <button class="btn btn-ghost" onclick="fdClientDetailBack()" style="padding:6px 12px;font-size:12px;">← Back</button>
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span id="fd-client-det-name" style="font-size:16px;font-weight:700;"></span>
+            <span id="fd-client-det-default-badge"></span>
+          </div>
+          <div id="fd-client-det-meta" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-ghost" onclick="editClient(currentClientId)" style="padding:6px 12px;font-size:12px;">✎ Edit</button>
+          <button class="btn" onclick="openAddProjectToClient(currentClientId)"
+            style="padding:6px 12px;font-size:12px;background:rgba(79,142,247,0.12);color:var(--accent);border:1px solid rgba(79,142,247,0.3);">＋ Add Project</button>
+          <button class="btn" onclick="deleteClient(currentClientId)"
+            style="padding:6px 12px;font-size:12px;background:rgba(247,79,126,0.1);color:var(--accent4);border:1px solid rgba(247,79,126,0.25);">✕ Delete</button>
+        </div>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:20px 24px;">
+        <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;">Linked Projects</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr>
+            <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Project</th>
+            <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Status</th>
+            <th style="padding:6px 10px;text-align:right;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);width:130px;">Contract Value</th>
+            <th style="width:36px;border-bottom:1px solid var(--border);"></th>
+          </tr></thead>
+          <tbody id="fd-client-det-projects"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Invoice detail view -->
+    <div id="fd-inv-detail-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+      <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;">
+        <button class="btn btn-ghost" onclick="fdInvDetailBack()" style="padding:6px 12px;font-size:12px;">← Back</button>
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span id="fd-inv-det-num" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent)"></span>
+            <span id="fd-inv-det-client" style="font-size:14px;font-weight:600;"></span>
+            <span id="fd-inv-det-status-badge"></span>
+          </div>
+          <div id="fd-inv-det-meta" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:20px;text-align:right;">
+          <div>
+            <div style="font-size:10px;color:var(--text-dim)">Grand Total</div>
+            <div id="fd-inv-det-total" style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--accent3)">$0.00</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text-dim)">Balance Due</div>
+            <div id="fd-inv-det-balance" style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--warn)">$0.00</div>
+          </div>
+        </div>
+        <button class="btn" onclick="openRecordInvPayment()" style="background:rgba(79,247,160,0.12);color:var(--accent3);border:1px solid rgba(79,247,160,0.3);font-size:12px;">
+          ＋ Record Payment
+        </button>
+      </div>
+      <div style="flex:1;overflow-y:auto;">
+        <!-- Line items -->
+        <div style="padding:20px 24px 0;">
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;">Line Items</div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">SKU</th>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Description</th>
+              <th style="padding:6px 10px;text-align:right;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);width:60px;">Qty</th>
+              <th style="padding:6px 10px;text-align:right;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);width:110px;">Unit Price</th>
+              <th style="padding:6px 10px;text-align:right;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);width:110px;">Line Total</th>
+            </tr></thead>
+            <tbody id="fd-inv-det-items"></tbody>
+          </table>
+        </div>
+        <!-- Adjustments -->
+        <div id="fd-inv-det-adj" style="padding:12px 24px 0;font-size:12px;color:var(--text-muted);display:flex;flex-direction:column;gap:4px;"></div>
+        <!-- Payments -->
+        <div style="padding:20px 24px 0;">
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;">Payment History</div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Date</th>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Method</th>
+              <th style="padding:6px 10px;text-align:right;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);width:130px;">Amount</th>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Notes</th>
+              <th style="width:36px;border-bottom:1px solid var(--border);"></th>
+            </tr></thead>
+            <tbody id="fd-inv-det-payments"></tbody>
+          </table>
+        </div>
+        <div style="height:40px;"></div>
+      </div>
+    </div>
+
+    <!-- Vendor Bill detail view -->
+    <div id="fd-bill-detail-view" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+      <div style="background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0;">
+        <button class="btn btn-ghost" onclick="fdBillDetailBack()" style="padding:6px 12px;font-size:12px;">← Back</button>
+        <div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span id="fd-bill-det-num" style="font-family:var(--font-mono);font-size:13px;font-weight:700;color:var(--accent2)"></span>
+            <span id="fd-bill-det-vendor" style="font-size:14px;font-weight:600;"></span>
+            <span id="fd-bill-det-status-badge"></span>
+          </div>
+          <div id="fd-bill-det-meta" style="font-size:12px;color:var(--text-muted);margin-top:2px;"></div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:20px;text-align:right;">
+          <div>
+            <div style="font-size:10px;color:var(--text-dim)">Grand Total</div>
+            <div id="fd-bill-det-total" style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--accent2)">$0.00</div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--text-dim)">Balance Due</div>
+            <div id="fd-bill-det-balance" style="font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--warn)">$0.00</div>
+          </div>
+        </div>
+        <button class="btn" onclick="openRecordBillPayment()" style="background:rgba(79,247,160,0.12);color:var(--accent3);border:1px solid rgba(79,247,160,0.3);font-size:12px;">
+          ＋ Record Payment
+        </button>
+      </div>
+      <div style="flex:1;overflow-y:auto;">
+        <div style="padding:20px 24px 0;">
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;">Line Items</div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">SKU</th>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Description</th>
+              <th style="padding:6px 10px;text-align:right;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);width:60px;">Qty</th>
+              <th style="padding:6px 10px;text-align:right;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);width:110px;">Unit Cost</th>
+              <th style="padding:6px 10px;text-align:right;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);width:110px;">Line Total</th>
+            </tr></thead>
+            <tbody id="fd-bill-det-items"></tbody>
+          </table>
+        </div>
+        <div id="fd-bill-det-adj" style="padding:12px 24px 0;font-size:12px;color:var(--text-muted);display:flex;flex-direction:column;gap:4px;"></div>
+        <div style="padding:20px 24px 0;">
+          <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;">Payment History</div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead><tr>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Date</th>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Method</th>
+              <th style="padding:6px 10px;text-align:right;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);width:130px;">Amount</th>
+              <th style="padding:6px 10px;text-align:left;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);border-bottom:1px solid var(--border);">Notes</th>
+              <th style="width:36px;border-bottom:1px solid var(--border);"></th>
+            </tr></thead>
+            <tbody id="fd-bill-det-payments"></tbody>
+          </table>
+        </div>
+        <div style="height:40px;"></div>
+      </div>
+    </div>
+  </div>
+
+<div id="toast"></div>
+</body>
+
+<!-- ══ TRANSFER MODAL ══ -->
+<div id="transfer-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:500;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:520px;max-width:95vw;overflow:hidden;">
+    <div style="padding:18px 24px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;">
+      <span style="font-size:16px">⇄</span>
+      <div>
+        <div style="font-size:15px;font-weight:700">Transfer Item</div>
+        <div id="xfr-subtitle" style="font-size:11px;color:var(--text-muted);margin-top:2px;font-family:var(--font-mono);"></div>
+      </div>
+      <button onclick="closeTransferModal()" style="margin-left:auto;background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:18px;line-height:1;">✕</button>
+    </div>
+    <div style="padding:20px 24px;display:flex;flex-direction:column;gap:16px;">
+      <div style="display:flex;gap:14px;">
+        <div style="flex:1;">
+          <div class="fl" style="margin-bottom:5px;">From Project</div>
+          <div id="xfr-from" style="font-size:13px;font-weight:600;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);">—</div>
+        </div>
+        <div style="flex:0 0 90px;">
+          <div class="fl" style="margin-bottom:5px;">Qty to Move</div>
+          <input type="number" id="xfr-qty" min="1" value="1"
+            style="width:100%;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-family:var(--font-mono);font-size:15px;font-weight:700;color:var(--text);outline:none;text-align:center;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"
+            oninput="xfrCheckReady()">
+        </div>
+      </div>
+      <div>
+        <div class="fl" style="margin-bottom:5px;">To Project <span style="font-size:9px;color:var(--text-dim)">(optional — leave blank to relocate within same project)</span></div>
+        <div class="ac-wrap">
+          <input class="ac-input" id="xfr-to-proj" type="text" placeholder="Type project name or ID — or leave blank for location-only move…"
+            autocomplete="off" oninput="xfrFilterProjects()" onfocus="xfrFilterProjects()" onkeydown="xfrProjKey(event)">
+          <div class="ac-dropdown" id="dd-xfr-proj" style="bottom:auto;top:calc(100% + 4px);"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;">
+          <div class="fl" style="margin-bottom:5px;">From Location</div>
+          <div id="xfr-from-loc" style="font-size:12px;padding:7px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text-muted);font-family:var(--font-mono);">—</div>
+        </div>
+        <div style="flex:1;">
+          <div class="fl" style="margin-bottom:5px;">To Location <span style="font-size:9px;color:var(--text-dim)">(optional)</span></div>
+          <select id="xfr-to-loc" style="display:none" oninput="xfrCheckReady()" onchange="xfrCheckReady()">
+            <option value="">— Keep current location —</option>
+          </select>
+          <div style="display:flex;gap:4px;">
+            <select id="xfr-to-loc-t1" class="plain-select" style="flex:1;min-width:0;" onchange="_locCascadeT1('xfr-to-loc')">
+              <option value="">Aisle…</option>
+            </select>
+            <select id="xfr-to-loc-t2" class="plain-select" style="flex:1;min-width:0;" disabled onchange="_locCascadeT2('xfr-to-loc')">
+              <option value="">Rack…</option>
+            </select>
+            <select id="xfr-to-loc-t3" class="plain-select" style="flex:1;min-width:0;" disabled onchange="_locCascadeT3('xfr-to-loc')">
+              <option value="">Shelf…</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="xfr-serial-list" style="display:none;max-height:180px;overflow-y:auto;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;"></div>
+      <div>
+        <div class="fl" style="margin-bottom:5px;">Transfer Note (optional)</div>
+        <input type="text" id="xfr-note" class="plain-input" placeholder="e.g. Pulled for service call">
+      </div>
+      <div id="xfr-warning" style="display:none;padding:10px 13px;background:rgba(247,201,79,0.07);border:1px solid rgba(247,201,79,0.22);border-radius:6px;font-size:12px;color:var(--warn);line-height:1.7;"></div>
+    </div>
+    <div style="padding:0 24px 20px;display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeTransferModal()" class="btn btn-ghost">Cancel</button>
+      <button id="xfr-confirm-btn" onclick="confirmTransfer()" disabled
+        style="padding:8px 20px;background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.35);border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s;">
+        ⇄ Confirm Transfer
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ NEW INVOICE MODAL ══ -->
+<div id="new-inv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:220;align-items:flex-start;justify-content:center;padding:32px 20px;overflow-y:auto;backdrop-filter:blur(4px);">
+  <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:680px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+    <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:15px;font-weight:700;">New Invoice</div>
+      <button onclick="closeNewInvoiceModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Project <span style="color:var(--accent4);font-size:8px">*</span></label>
+        <select class="plain-select" id="ni-project" onchange="niProjectChanged()">
+          <option value="">— Select Project —</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Invoice # <span style="color:var(--accent4);font-size:8px">*</span></label>
+        <input class="plain-input" id="ni-num" type="text" placeholder="INV-2025-001" oninput="niCheckReady()">
+      </div>
+      <div class="fg"><label class="fl">Status</label>
+        <select class="plain-select" id="ni-status">
+          <option>Draft</option><option>Sent</option><option>Partial</option><option>Paid</option><option>Overdue</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Date</label>
+        <input class="plain-input" id="ni-date" type="date">
+      </div>
+      <div class="fg"><label class="fl">Due Date</label>
+        <input class="plain-input" id="ni-due" type="date">
+      </div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Notes</label>
+        <input class="plain-input" id="ni-notes" type="text" placeholder="Optional">
+      </div>
+    </div>
+    <!-- Scope items picker -->
+    <div id="ni-scope-section" style="display:none;padding:0 24px 16px;">
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;">Scope Items — check to include</div>
+      <div id="ni-scope-list" style="border:1px solid var(--border);border-radius:6px;overflow:hidden;max-height:240px;overflow-y:auto;"></div>
+    </div>
+    <!-- Adjustments -->
+    <div style="padding:0 24px 16px;">
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;border-top:1px solid var(--border);padding-top:14px;">Adjustments</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11px;color:var(--text-muted);width:62px;flex-shrink:0;">Labor</span>
+          <button type="button" id="ni-labor-mode" onclick="niToggleMode('labor')" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+          <input id="ni-labor-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="niUpdateTotal()">
+          <span id="ni-labor-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11px;color:var(--text-muted);width:62px;flex-shrink:0;">Tax</span>
+          <button type="button" id="ni-tax-mode" onclick="niToggleMode('tax')" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+          <input id="ni-tax-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="niUpdateTotal()">
+          <span id="ni-tax-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11px;color:var(--text-muted);width:62px;flex-shrink:0;">Tariff</span>
+          <button type="button" id="ni-tariff-mode" onclick="niToggleMode('tariff')" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+          <input id="ni-tariff-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="niUpdateTotal()">
+          <span id="ni-tariff-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11px;color:var(--text-muted);width:62px;flex-shrink:0;">Shipping</span>
+          <button type="button" id="ni-shipping-mode" onclick="niToggleMode('shipping')" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+          <input id="ni-shipping-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="niUpdateTotal()">
+          <span id="ni-shipping-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;align-items:baseline;gap:20px;border-top:1px solid var(--border);padding-top:10px;margin-top:12px;">
+        <div style="font-size:12px;color:var(--text-muted);">Subtotal: <span id="ni-subtotal-disp" style="font-family:var(--font-mono);">$0.00</span></div>
+        <div style="text-align:right;"><div style="font-size:10px;color:var(--text-dim);">Grand Total</div><div id="ni-total" style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--accent3)">$0.00</div></div>
+      </div>
+    </div>
+    <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:16px;">
+      <button onclick="closeNewInvoiceModal()" class="btn btn-ghost">Cancel</button>
+      <button onclick="confirmNewInvoice()" id="ni-confirm-btn" class="btn" disabled
+        style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Create Invoice</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ NEW VENDOR BILL MODAL ══ -->
+<div id="new-bill-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:220;align-items:flex-start;justify-content:center;padding:32px 20px;overflow-y:auto;backdrop-filter:blur(4px);">
+  <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:680px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+    <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+      <div id="nb-modal-title" style="font-size:15px;font-weight:700;">New Vendor Bill</div>
+      <button onclick="closeNewBillModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Vendor <span style="color:var(--accent4);font-size:8px">*</span></label>
+        <select class="plain-select" id="nb-vendor" style="width:100%;" onchange="vendorSelectChanged(this)"></select>
+      </div>
+      <div class="fg"><label class="fl">Bill # <span style="color:var(--accent4);font-size:8px">*</span></label>
+        <input class="plain-input" id="nb-num" type="text" placeholder="Bill number" oninput="nbCheckReady()">
+      </div>
+      <div class="fg"><label class="fl">Status</label>
+        <select class="plain-select" id="nb-status">
+          <option>Draft</option><option selected>Received</option><option>Partial</option><option>Paid</option><option>Overdue</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Date</label>
+        <input class="plain-input" id="nb-date" type="date">
+      </div>
+      <div class="fg"><label class="fl">Due Date</label>
+        <input class="plain-input" id="nb-due" type="date">
+      </div>
+      <div id="nb-po-row" class="fg" style="grid-column:1/-1;display:none;">
+        <label class="fl">Purchase Order <span style="color:var(--accent4);font-size:8px">*</span></label>
+        <select class="plain-select" id="nb-po-num" onchange="if(this.value) _loadBillFromPO(this.value)" style="color:var(--accent);font-family:var(--font-mono);">
+          <option value="">— Select a PO to bill from —</option>
+        </select>
+      </div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Notes</label>
+        <input class="plain-input" id="nb-notes" type="text" placeholder="Optional">
+      </div>
+    </div>
+    <!-- PO items (pre-filled from PO) OR manual items -->
+    <div style="padding:0 24px 16px;">
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;">Line Items</div>
+      <div id="nb-items-list" style="border:1px solid var(--border);border-radius:6px;overflow:hidden;min-height:44px;"></div>
+      <!-- Manual item add row -->
+      <div id="nb-add-item-row" style="display:flex;gap:8px;align-items:flex-end;margin-top:10px;flex-wrap:wrap;">
+        <div class="fg" style="flex:1;min-width:160px"><label class="fl">Description</label>
+          <input class="plain-input" id="nb-item-desc" type="text" placeholder="Item description">
+        </div>
+        <div class="fg" style="flex:0 0 60px"><label class="fl">Qty</label>
+          <input class="plain-input" id="nb-item-qty" type="number" min="0" step="0.01" value="1">
+        </div>
+        <div class="fg" style="flex:0 0 100px"><label class="fl">Unit Cost ($)</label>
+          <input class="plain-input" id="nb-item-cost" type="number" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <button class="btn-add" onclick="nbAddItem()">Add</button>
+      </div>
+    </div>
+    <!-- Adjustments -->
+    <div style="padding:0 24px 16px;">
+      <div style="font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px;border-top:1px solid var(--border);padding-top:14px;">Adjustments</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11px;color:var(--text-muted);width:62px;flex-shrink:0;">Tax</span>
+          <button type="button" id="nb-tax-mode" onclick="nbToggleMode('tax')" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+          <input id="nb-tax-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="nbUpdateTotal()">
+          <span id="nb-tax-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11px;color:var(--text-muted);width:62px;flex-shrink:0;">Tariff</span>
+          <button type="button" id="nb-tariff-mode" onclick="nbToggleMode('tariff')" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+          <input id="nb-tariff-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="nbUpdateTotal()">
+          <span id="nb-tariff-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:11px;color:var(--text-muted);width:62px;flex-shrink:0;">Shipping</span>
+          <button type="button" id="nb-shipping-mode" onclick="nbToggleMode('shipping')" style="padding:2px 8px;font-size:11px;font-weight:700;min-width:34px;border-radius:4px;background:var(--surface3);border:1px solid var(--border);color:var(--text);cursor:pointer;">$</button>
+          <input id="nb-shipping-val" type="number" min="0" step="0.01" placeholder="0.00" class="plain-input" style="width:100px;" oninput="nbUpdateTotal()">
+          <span id="nb-shipping-calc" style="font-size:11px;font-family:var(--font-mono);color:var(--accent3);min-width:90px;"></span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;align-items:baseline;gap:20px;border-top:1px solid var(--border);padding-top:10px;margin-top:12px;">
+        <div style="font-size:12px;color:var(--text-muted);">Subtotal: <span id="nb-subtotal-disp" style="font-family:var(--font-mono);">$0.00</span></div>
+        <div style="text-align:right;"><div style="font-size:10px;color:var(--text-dim);">Grand Total</div><div id="nb-total" style="font-family:var(--font-mono);font-size:16px;font-weight:700;color:var(--accent3)">$0.00</div></div>
+      </div>
+    </div>
+    <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid var(--border);padding-top:16px;">
+      <button onclick="closeNewBillModal()" class="btn btn-ghost">Cancel</button>
+      <button onclick="confirmNewBill()" id="nb-confirm-btn" class="btn" disabled
+        style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Create Bill</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ NEW / EDIT CLIENT MODAL ══ -->
+<div id="client-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+    <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+      <div id="client-modal-title" style="font-size:15px;font-weight:700;">New Client</div>
+      <button onclick="closeClientModal()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px 24px 24px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Business / Household Name <span style="color:var(--accent4);font-size:8px">*</span></label>
+        <input class="plain-input" id="client-name" type="text" oninput="clientCheckReady()"></div>
+      <div class="fg"><label class="fl">First Name</label><input class="plain-input" id="client-first" type="text"></div>
+      <div class="fg"><label class="fl">Last Name</label><input class="plain-input" id="client-last" type="text"></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Street Address</label><input class="plain-input" id="client-street" type="text" placeholder="3351 La Cienega Pl"></div>
+      <div class="fg" style="grid-column:1/-1;display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;">
+        <div><label class="fl">City</label><input class="plain-input" id="client-city" type="text" placeholder="Los Angeles"></div>
+        <div><label class="fl">State</label><input class="plain-input" id="client-state" type="text" placeholder="CA"></div>
+        <div><label class="fl">ZIP</label><input class="plain-input" id="client-zip" type="text" placeholder="90016"></div>
+      </div>
+      <div class="fg"><label class="fl">Phone</label><input class="plain-input" id="client-phone" type="text" placeholder="555-0100"></div>
+      <div class="fg"><label class="fl">Email</label><input class="plain-input" id="client-email" type="text"></div>
+      <div class="fg" style="grid-column:1/-1"><label class="fl">Notes</label><input class="plain-input" id="client-notes" type="text"></div>
+      <div class="fg" style="grid-column:1/-1;display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="client-isdefault" style="width:16px;height:16px;cursor:pointer;">
+        <label for="client-isdefault" style="font-size:12px;color:var(--text-muted);cursor:pointer;">Mark as default client</label>
+      </div>
+    </div>
+    <div style="padding:0 24px 22px;display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeClientModal()" class="btn btn-ghost">Cancel</button>
+      <button onclick="saveClientModal()" id="client-modal-save-btn" class="btn" disabled
+        style="background:var(--accent);color:#fff;border:none;padding:9px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADD PROJECT TO CLIENT MODAL ══ -->
+<div id="add-proj-to-client-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:210;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:500px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+    <div style="padding:22px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+      <div style="font-size:15px;font-weight:700;">Add Project to Client</div>
+      <button onclick="closeAddProjToClient()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px 24px 24px;display:flex;flex-direction:column;gap:16px;">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Link Existing Project</div>
+        <div style="display:flex;gap:8px;">
+          <select class="plain-select" id="apc-existing-sel" style="flex:1;">
+            <option value="">— select unlinked project —</option>
+          </select>
+          <button class="btn" onclick="confirmLinkExistingProject()"
+            style="background:rgba(79,142,247,0.15);color:var(--accent);border:1px solid rgba(79,142,247,0.35);font-size:12px;">Link</button>
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:16px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;">Create New Project</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <input class="plain-input" id="apc-new-proj-name" type="text" placeholder="Project name *" oninput="apcCheckReady()">
+          <div style="display:flex;gap:8px;">
+            <select class="plain-select" id="apc-new-proj-status" style="flex:1;">
+              <option>Open</option><option>In Progress</option><option>Complete</option>
+            </select>
+            <input class="plain-input" id="apc-new-proj-value" type="number" min="0" step="0.01" placeholder="Contract value ($)" style="width:150px;">
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:12px;">
+          <button onclick="confirmNewProjectForClient()" id="apc-create-btn" class="btn" disabled
+            style="background:var(--accent);color:#fff;border:none;padding:8px 18px;border-radius:6px;font-family:var(--font-ui);font-size:12px;font-weight:700;cursor:pointer;">Create &amp; Link</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ RECORD PAYMENT MODAL ══ -->
+<div id="record-payment-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:250;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:var(--surface);border:1px solid var(--border-bright);border-radius:12px;width:400px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+    <div style="padding:20px 24px 0;display:flex;justify-content:space-between;align-items:center;">
+      <div id="rp-modal-title" style="font-size:15px;font-weight:700;">Record Payment</div>
+      <button onclick="closeRecordPayment()" style="background:none;border:none;color:var(--text-muted);font-size:17px;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:18px 24px 20px;display:flex;flex-direction:column;gap:12px;">
+      <div class="fg"><label class="fl">Date <span style="color:var(--accent4);font-size:8px">*</span></label>
+        <input class="plain-input" id="rp-date" type="date">
+      </div>
+      <div class="fg"><label class="fl">Amount ($) <span style="color:var(--accent4);font-size:8px">*</span></label>
+        <input class="plain-input" id="rp-amount" type="number" min="0" step="0.01" placeholder="0.00" oninput="rpCheckReady()">
+      </div>
+      <div class="fg"><label class="fl">Method</label>
+        <select class="plain-select" id="rp-method">
+          <option>Check</option><option>ACH</option><option>Wire</option><option>Credit Card</option><option>Cash</option><option>Other</option>
+        </select>
+      </div>
+      <div class="fg"><label class="fl">Notes</label>
+        <input class="plain-input" id="rp-notes" type="text" placeholder="Optional">
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);">Balance due: <span id="rp-balance-display" style="font-family:var(--font-mono);color:var(--warn);">$0.00</span></div>
+    </div>
+    <div style="padding:0 24px 20px;display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="closeRecordPayment()" class="btn btn-ghost">Cancel</button>
+      <button onclick="confirmRecordPayment()" id="rp-confirm-btn" class="btn" disabled
+        style="background:rgba(79,247,160,0.15);color:var(--accent3);border:1px solid rgba(79,247,160,0.35);padding:8px 20px;border-radius:6px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;">Record Payment</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/core.js?v=15"></script>
+<script src="js/data.js?v=10"></script>
+<script src="js/inventory.js?v=20"></script>
+<script src="js/deploy.js?v=7"></script>
+<script src="js/pricebook.js?v=4"></script>
+<script src="js/projects.js?v=33"></script>
+<script src="js/orders.js?v=25"></script>
+<script src="js/rmas.js?v=6"></script>
+<script src="js/stock.js?v=3"></script>
+<script src="js/locations.js?v=4"></script>
+<script src="js/frontdesk.js?v=13"></script>
+<script src="js/export.js?v=5"></script>
+
+</html>
+
+

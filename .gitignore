@@ -1,0 +1,17 @@
+# Local database — never commit
+avprocure.db
+*.db
+
+# Generated demo database (rebuild with demo/build.sh)
+demo/*.db
+
+# Local working areas
+scratch/
+other/
+.claude/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp

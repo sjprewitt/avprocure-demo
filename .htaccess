@@ -1,0 +1,22 @@
+RewriteEngine On
+RewriteBase /avprocure/
+
+# Block sensitive files
+RewriteRule ^avprocure\.db$                 - [F,L]
+RewriteRule ^index\.html$                   - [F,L]
+RewriteRule ^auth\.php$                     - [F,L]
+RewriteRule ^save\.php$                     - [F,L]
+RewriteRule ^migrate\.php$                  - [F,L]
+RewriteRule ^avprocure-export\.xlsx$ - [F,L]
+RewriteRule ^changelog\.txt$               - [F,L]
+RewriteRule ^README\.md$                   - [F,L]
+RewriteRule ^schema\.sql$                  - [F,L]
+RewriteRule ^\.git(/.*)?$                  - [F,L]
+RewriteRule ^backup(/.*)?$                 - [F,L]
+RewriteRule ^docs(/.*)?$                   - [F,L]
+
+# API routing (unchanged)
+RewriteRule ^api(/.*)?$ api.php$1 [L,QSA]
+
+# Root → gate.php
+RewriteRule ^$ gate.php [L]
