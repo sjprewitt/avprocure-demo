@@ -1,5 +1,5 @@
 RewriteEngine On
-RewriteBase /avprocure/
+RewriteBase /demo/avprocure/
 
 # Block sensitive files
 RewriteRule ^avprocure\.db$                 - [F,L]

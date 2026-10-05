@@ -5,14 +5,14 @@ declare(strict_types=1);
 
 function auth_session_start(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
-    session_name('avpsid');
+    session_name('avpsid_demo');
     ini_set('session.cookie_secure',   '1');
     ini_set('session.cookie_httponly', '1');
     ini_set('session.cookie_samesite', 'Strict');
     ini_set('session.use_strict_mode', '1');
     ini_set('session.gc_maxlifetime',  '28800');
     ini_set('session.cookie_lifetime', '0');
-    ini_set('session.cookie_path',     '/avprocure/');
+    ini_set('session.cookie_path',     '/demo/avprocure/');
     session_start();
 }
 
